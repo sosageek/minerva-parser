@@ -1,11 +1,11 @@
-from .base import BaseParser
+from abc import ABC, abstractmethod
 
-class WikipediaParser(BaseParser):
+class BaseParser(ABC):
 
+    @abstractmethod
     async def parse(self, url: str) -> dict:
-        #TODO
         pass
 
+    @abstractmethod
     def clean_markdown(self, text: str) -> str:
-        #TODO
         pass
