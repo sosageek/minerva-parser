@@ -1,7 +1,7 @@
 import re
 import html
 from abc import ABC, abstractmethod
-from crawl4ai import AsyncWebCrawler, BrowserConfig, CrawlerRunConfig, CacheMode
+from crawl4ai import BrowserConfig, CrawlerRunConfig, CacheMode
 
 class Parser(ABC):
 
