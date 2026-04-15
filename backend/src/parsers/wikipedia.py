@@ -7,7 +7,7 @@ class WikipediaParser(Parser):
 
     def __init__(self):
         super().__init__(
-            excluded_selector=".mw-navigation, #mw-head, #mw-panel, .navbox, .sidebar, .toc, .hatnote, .ambox, .infobox, .mw-page-description",
+            excluded_selector=".mw-navigation, #mw-head, #mw-panel, .navbox, .sidebar, .toc, .hatnote, .ambox, .infobox, .mw-page-description, .geo-dec, .geo-dms, .coordinates, #coordinates",
             target_elements=["#mw-content-text"]
         )
 
@@ -41,6 +41,8 @@ class WikipediaParser(Parser):
         text = re.sub(r'\(https?://(?:[^\s)\\]|\\.)+\)', '', text)
         text = re.sub(r'https?://(?:[^\s)\\]|\\.)+', '', text)
         text = re.sub(r'^Disambiguation\s*[–—-][^\n]*\n?', '', text, flags=re.MULTILINE)
+        text = re.sub(r'^.*(?:WikiMiniAtlas|\d+°\d+[′\']\d+[″"][NSEW]).*\n?', '', text, flags=re.MULTILINE)
+        text = re.sub(r'^[\s\ufeff/;.\d°′″,NSEW-]+$', '', text, flags=re.MULTILINE)
         text = re.sub(r'\( "[^"]*"\)', '', text)
         text = re.split(
             r'^#{1,6}\s+(?:Notes|References|Bibliography|See also|Further reading|External links|Categories|Career statistics|Honours|Honors|Awards|Discography|Filmography|Selected works|Publications)\s*$',
