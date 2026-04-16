@@ -1,11 +1,26 @@
-import re
-import html
 from abc import ABC, abstractmethod
+
 from crawl4ai import BrowserConfig, CrawlerRunConfig, CacheMode
 
+
 class Parser(ABC):
+    """Classe astratta per parser di pagine che producono markdown pulito
+
+    le sottoclassi devono implementare ``parse`` e ``clean_markdown``
+    Per pulizia generica usare le funzioni del modulo ``cleaning``
+
+    Attributes:
+        browser_config: configurazione del browser usata da ``crawl4ai``
+        crawler_config: configurazione della run di crawling
+    """
 
     def __init__(self, excluded_selector: str = "", target_elements: list[str] | None = None):
+        """Inizializza la configurazione di browser e crawler
+
+        Args:
+            excluded_selector: selettore CSS con gli elementi da escludere
+            target_elements: lista di selettori CSS su cui restringere l'estrazione
+        """
         self.browser_config = BrowserConfig(headless=True)
         self.crawler_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
@@ -13,29 +28,32 @@ class Parser(ABC):
             word_count_threshold=10,
             remove_forms=True,
             excluded_selector=excluded_selector,
-            target_elements = target_elements or []
+            target_elements=target_elements or [],
         )
 
     @abstractmethod
     async def parse(self, url: str) -> dict:
+        """Scarica la pagina e ne estrae il markdown pulito
+
+        Args:
+            url: URL assoluto della pagina da acquisire
+
+        Returns:
+            un dizionario con chiavi ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``
+
+        Raises:
+            ValueError: se il fetch della pagina fallisce
+        """
         pass
 
     @abstractmethod
     def clean_markdown(self, text: str) -> str:
-        pass
+        """Applica pipeline di pulizia specifica rispetto al dominio
 
-    def _clean_markdown_common(self, text: str) -> str:
-        text = re.sub(r'!\[[^\]]*\]\((?:[^()]*|\([^()]*\))*\)', '', text)
-        text = re.sub(r'\[([^\]]+)\]\((?:[^()]*|\([^()]*\))*\)', r'\1', text)
-        text = re.sub(r'\[([^\]]+)\]\[[^\]]*\]', r'\1', text)
-        text = re.sub(r'^\[[^\]]+\]:\s+\S+.*$', '', text, flags=re.MULTILINE)
-        text = re.sub(r'\[[^\]]{0,50}\]', '', text)
-        text = re.sub(r'^\|.*\|$',   '', text, flags=re.MULTILINE)
-        text = re.sub(r'^[|:\-\s]+$', '', text, flags=re.MULTILINE)
-        text = re.sub(r'<[^>]+>', '', text)
-        text = html.unescape(text)
-        text = re.sub(r'(?<!\[)\]|\[(?!\])', '', text)
-        text = re.sub(r'\s+([.,;:!?)\]])', r'\1', text)
-        text = re.sub(r'[ \t]+', ' ', text)
-        text = re.sub(r'\n{3,}', '\n\n', text)
-        return text.strip()
+        Args:
+            text: testo MD grezzo estratto dalla pagina
+
+        Returns:
+            testo MD pulito
+        """
+        pass
