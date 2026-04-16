@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-
 from crawl4ai import BrowserConfig, CrawlerRunConfig, CacheMode
+from .schema import ParsedDocument
 
 
 class Parser(ABC):
@@ -32,14 +32,15 @@ class Parser(ABC):
         )
 
     @abstractmethod
-    async def parse(self, url: str) -> dict:
+    async def parse(self, url: str) -> ParsedDocument:
         """Scarica la pagina e ne estrae il markdown pulito
 
         Args:
             url: URL assoluto della pagina da acquisire
 
         Returns:
-            un dizionario con chiavi ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``
+            un ``ParsedDocument`` con ``url``, ``domain``, ``title``,
+            ``html_text`` e ``parsed_text``
 
         Raises:
             ValueError: se il fetch della pagina fallisce
