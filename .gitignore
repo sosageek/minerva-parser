@@ -209,5 +209,7 @@ __marimo__/
 .DS_Store
 output.txt
 test_wiki.py
+test_meteoam.py
 minerva-parser
+.claude/
 tests
