@@ -11,13 +11,27 @@ interfacce:
 import html
 import re
 
-MAX_ORPHAN_BRACKET_LEN = 50
+_FOOTNOTE_CONTENT = (
+    r'\d{1,3}'
+    r'|[a-z]{1,3}'
+    r'|[*\u2020\u2021\u00a7\u00b6]+'
+    r'|(?:note|nb|n)\s+\d+'
+    r'|citation\s+needed'
+    r'|clarification\s+needed'
+    r'|better\s+source\s+needed'
+    r'|failed\s+verification'
+    r'|original\s+research\??'
+    r'|according\s+to\s+whom\??'
+    r'|dubious(?:\s*[\u2013\u2014\-][^\]]*)?'
+    r'|sic\??'
+    r'|(?:who|when|where|why|which|what|how)\?'
+)
 
 _RE_IMAGE       = re.compile(r'!\[[^\]]*\]\((?:[^()]*|\([^()]*\))*\)')
-_RE_LINK        = re.compile(r'\[([^\]]+)\]\((?:[^()]*|\([^()]*\))*\)')
+_RE_LINK        = re.compile(r'\[([^\]]*)\]\((?:[^()]*|\([^()]*\))*\)')
 _RE_REF_LINK    = re.compile(r'\[([^\]]+)\]\[[^\]]*\]')
 _RE_REF_DEF     = re.compile(r'^\[[^\]]+\]:\s+\S+.*$', re.MULTILINE)
-_RE_ORPHAN_BR   = re.compile(r'\[[^\]]{0,%d}\]' % MAX_ORPHAN_BRACKET_LEN)
+_RE_ORPHAN_BR   = re.compile(rf'\[(?:{_FOOTNOTE_CONTENT})\]', re.IGNORECASE)
 
 _RE_TABLE_ROW   = re.compile(r'^\|.*\|$', re.MULTILINE)
 _RE_TABLE_SEP   = re.compile(r'^[|:\-\s]+$', re.MULTILINE)
