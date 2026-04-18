@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 from crawl4ai import AsyncWebCrawler
 from .parser import Parser
 from .schema import ParsedDocument
@@ -18,9 +18,9 @@ class WikipediaParser(Parser):
     _RE_IPA_LINK         = re.compile(r'\[\[([^\]]*)\]\]\([^)]*Help:IPA[^)]*\)')
     _RE_BRACKET_LINK     = re.compile(r'\[\[[^\]]*\]\]\([^)]*\)')
 
-    _RE_URL_WITH_CAPTION = re.compile(r'\(https?://(?:[^\s)\\]|\\.)+\)(?=\S)[^\n]*')
+    _RE_URL_WITH_CAPTION = re.compile(r'\(https?://(?:[^\s)\\]|\\.)+\)(?=\S)\S*')
     _RE_URL_PAREN        = re.compile(r'\(https?://(?:[^\s)\\]|\\.)+\)')
-    _RE_URL_BARE         = re.compile(r'https?://(?:[^\s)\\]|\\.)+')
+    _RE_URL_BARE         = re.compile(r'https?://(?:[^\s)\\]|\\.)*[^\s)\\.,;:!?]')
 
     _RE_DISAMBIG         = re.compile(r'^Disambiguation\s*[–—-][^\n]*\n?', re.MULTILINE)
     _RE_COORDINATES      = re.compile(
@@ -35,7 +35,8 @@ class WikipediaParser(Parser):
             excluded_selector=(
                 ".mw-navigation, #mw-head, #mw-panel, .navbox, .sidebar, .toc, "
                 ".hatnote, .ambox, .infobox, .shortdescription, .geo-dec, "
-                ".geo-dms, .coordinates, #coordinates"
+                ".geo-dms, .coordinates, #coordinates, "
+                ".mw-editsection"
             ),
             target_elements=["#mw-content-text"],
         )
@@ -44,27 +45,28 @@ class WikipediaParser(Parser):
         async with AsyncWebCrawler(config=self.browser_config) as crawler:
             result = await crawler.arun(url=url, config=self.crawler_config)
 
-        # TODO: risolvere bottleneck di AsyncWebCrawler che apre e chiude
-        # chromium a ogni chiamata di parse
+        # TODO: risolvere bottleneck di AsyncWebCrawler che apre e chiude chromium a ogni chiamata di parse
 
         if not result.success:
             raise ValueError(f"errore: impossibile raggiungere {url}")
 
+        final_url = getattr(result, "url", None) or url
+
         return ParsedDocument(
-            url=url,
-            domain=urlparse(url).netloc,
-            title=self._extract_title(url),
+            url=final_url,
+            domain=urlparse(final_url).netloc,
+            title=self._extract_title(final_url),
             html_text=result.cleaned_html,
             parsed_text=self.clean_markdown(result.markdown),
         )
 
     def clean_markdown(self, text: str) -> str:
+        text = self._truncate_terminal_sections(text)
         text = self._normalize_wiki_links(text)
         text = strip_markdown_syntax(text)
-        text = normalize_whitespace(text)
         text = self._remove_urls(text)
         text = self._remove_wiki_metadata(text)
-        text = self._truncate_terminal_sections(text)
+        text = normalize_whitespace(text)
         return text.strip()
 
     def _normalize_wiki_links(self, text: str) -> str:
@@ -94,4 +96,8 @@ class WikipediaParser(Parser):
 
     def _extract_title(self, url: str) -> str:
         path = urlparse(url).path
-        return path.split("/wiki/")[-1].replace("_", " ")
+        if "/wiki/" in path:
+            title = path.split("/wiki/", 1)[1]
+        else:
+            title = path.rstrip("/").rsplit("/", 1)[-1]
+        return unquote(title).replace("_", " ")
