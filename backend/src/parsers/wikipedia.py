@@ -1,6 +1,5 @@
 import re
 from urllib.parse import urlparse, unquote
-from crawl4ai import AsyncWebCrawler
 from .parser import Parser
 from .schema import ParsedDocument
 from ..utils.cleaning import strip_markdown_syntax, normalize_whitespace
@@ -42,14 +41,7 @@ class WikipediaParser(Parser):
         )
 
     async def parse(self, url: str) -> ParsedDocument:
-        async with AsyncWebCrawler(config=self.browser_config) as crawler:
-            result = await crawler.arun(url=url, config=self.crawler_config)
-
-        # TODO: risolvere bottleneck di AsyncWebCrawler che apre e chiude chromium a ogni chiamata di parse
-
-        if not result.success:
-            raise ValueError(f"errore: impossibile raggiungere {url}")
-
+        result = await self._fetch(url)
         final_url = getattr(result, "url", None) or url
 
         return ParsedDocument(
