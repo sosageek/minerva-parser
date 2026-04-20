@@ -33,7 +33,7 @@ _RE_REF_LINK    = re.compile(r'\[([^\]]+)\]\[[^\]]*\]')
 _RE_REF_DEF     = re.compile(r'^\[[^\]]+\]:\s+\S+.*$', re.MULTILINE)
 _RE_ORPHAN_BR   = re.compile(rf'\[(?:{_FOOTNOTE_CONTENT})\]', re.IGNORECASE)
 
-_RE_TABLE_ROW   = re.compile(r'^\|.*\|$', re.MULTILINE)
+_RE_TABLE_ROW   = re.compile(r'^\|.*\|\s*$', re.MULTILINE)
 _RE_TABLE_SEP   = re.compile(r'^[|:\-\s]+$', re.MULTILINE)
 
 _RE_HTML_TAG    = re.compile(r'<(?:!--.*?--|/?[a-zA-Z][^<>]*)>', re.DOTALL)
