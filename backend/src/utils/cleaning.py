@@ -6,6 +6,9 @@ _RE_LINK        = re.compile(r'\[([^\]]*)\]\((?:[^()]*|\([^()]*\))*\)')
 _RE_REF_LINK    = re.compile(r'\[([^\]]+)\]\[[^\]]*\]')
 _RE_REF_DEF     = re.compile(r'^\[[^\]]+\]:\s+\S+.*$', re.MULTILINE)
 
+_RE_FENCED_CODE = re.compile(r'^```[^\n]*\n(.*?)\n```[ \t]*$', re.MULTILINE | re.DOTALL)
+_RE_INLINE_CODE = re.compile(r'`([^`\n]+)`')
+
 _RE_TABLE_ROW   = re.compile(r'^\|.*\|$', re.MULTILINE)
 _RE_TABLE_SEP   = re.compile(r'^[|:\-\s]+$', re.MULTILINE)
 
@@ -23,6 +26,7 @@ def remove_markup(text: str) -> str:
 
     * cancella ``![alt](url)``, ``[id]:``, righe di tabella md, tag HTML e commenti, quadre spaiate
     * sostituisce ``[testo](url)``, ``[testo][id]`` con solo testo
+    * preserva il contenuto di snippet di codice (fenced ``` e inline ``` ` ```) rimuovendone i delimitatori
 
     Args:
         text: markdown grezzo
@@ -30,6 +34,8 @@ def remove_markup(text: str) -> str:
     Returns:
         il testo privato senza markdown e html (spazi e newline non normalizzati)
     """
+    text = _RE_FENCED_CODE.sub(r'\1', text)
+    text = _RE_INLINE_CODE.sub(r'\1', text)
     text = _RE_IMAGE.sub('', text)
     text = _RE_LINK.sub(r'\1', text)
     text = _RE_REF_LINK.sub(r'\1', text)
