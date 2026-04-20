@@ -1,2 +1,2 @@
-from .markdown import strip_markdown
-from .cleaning import strip_markdown_syntax, normalize_whitespace
+from .markdown import strip_formatting
+from .cleaning import remove_markup, normalize_whitespace

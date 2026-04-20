@@ -2,7 +2,7 @@ import re
 from urllib.parse import urlparse, unquote
 from .parser import Parser
 from .schema import ParsedDocument
-from ..utils.cleaning import strip_markdown_syntax, normalize_whitespace
+from ..utils.cleaning import remove_markup, normalize_whitespace
 
 
 class WikipediaParser(Parser):
@@ -16,6 +16,25 @@ class WikipediaParser(Parser):
 
     _RE_IPA_LINK         = re.compile(r'\[\[([^\]]*)\]\]\([^)]*Help:IPA[^)]*\)')
     _RE_BRACKET_LINK     = re.compile(r'\[\[[^\]]*\]\]\([^)]*\)')
+
+    _RE_FOOTNOTE_REF     = re.compile(
+        r'\[(?:'
+        r'\d{1,3}'
+        r'|[a-z]{1,3}'
+        r'|[*\u2020\u2021\u00a7\u00b6]+'
+        r'|(?:note|nb|n)\s+\d+'
+        r'|citation\s+needed'
+        r'|clarification\s+needed'
+        r'|better\s+source\s+needed'
+        r'|failed\s+verification'
+        r'|original\s+research\??'
+        r'|according\s+to\s+whom\??'
+        r'|dubious(?:\s*[\u2013\u2014\-][^\]]*)?'
+        r'|sic\??'
+        r'|(?:who|when|where|why|which|what|how)\?'
+        r')\](?!\()',
+        re.IGNORECASE,
+    )
 
     _RE_URL_WITH_CAPTION = re.compile(r'\(https?://(?:[^\s)\\]|\\.)+\)(?=\S)\S*')
     _RE_URL_PAREN        = re.compile(r'\(https?://(?:[^\s)\\]|\\.)+\)')
@@ -34,8 +53,7 @@ class WikipediaParser(Parser):
             excluded_selector=(
                 ".mw-navigation, #mw-head, #mw-panel, .navbox, .sidebar, .toc, "
                 ".hatnote, .ambox, .infobox, .shortdescription, .geo-dec, "
-                ".geo-dms, .coordinates, #coordinates, "
-                ".mw-editsection"
+                ".geo-dms, .coordinates, #coordinates, .mw-editsection, .noprint"
             ),
             target_elements=["#mw-content-text"],
         )
@@ -49,13 +67,14 @@ class WikipediaParser(Parser):
             domain=urlparse(final_url).netloc,
             title=self._extract_title(final_url),
             html_text=result.cleaned_html,
-            parsed_text=self.clean_markdown(result.markdown),
+            parsed_text=self.normalize(result.markdown),
         )
 
-    def clean_markdown(self, text: str) -> str:
+    def normalize(self, text: str) -> str:
         text = self._truncate_terminal_sections(text)
         text = self._normalize_wiki_links(text)
-        text = strip_markdown_syntax(text)
+        text = self._remove_footnote_refs(text)
+        text = remove_markup(text)
         text = self._remove_urls(text)
         text = self._remove_wiki_metadata(text)
         text = normalize_whitespace(text)
@@ -66,6 +85,10 @@ class WikipediaParser(Parser):
         text = self._RE_IPA_LINK.sub(r'/\1/', text)
         text = self._RE_BRACKET_LINK.sub('', text)
         return text
+
+    def _remove_footnote_refs(self, text: str) -> str:
+        """Cancella riferimenti a note wiki tra quadre"""
+        return self._RE_FOOTNOTE_REF.sub('', text)
 
     def _remove_urls(self, text: str) -> str:
         """Cancella URL (anche tra parentesi con eventuali caption)"""

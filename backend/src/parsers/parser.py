@@ -7,13 +7,9 @@ from ._crawler import get_crawler
 class CrawlError(Exception):
     """Errore di fetch di una pagina web
 
-    Portiamo dietro ``status_code`` e ``error_message`` così chi ci sta sopra
-    (ad esempio il server FastAPI) può mappare l'errore a una risposta HTTP
-    coerente senza dover parsare stringhe.
-
     Attributes:
         url: URL richiesto
-        status_code: status HTTP restituito dal server, se disponibile
+        status_code: status HTTP restituito dal server(se disponibile)
         error_message: messaggio di errore grezzo da crawl4ai
     """
 
@@ -31,11 +27,9 @@ class CrawlError(Exception):
 class Parser(ABC):
     """Classe astratta per parser di pagine che producono markdown pulito
 
-    Le sottoclassi devono implementare ``parse`` e ``clean_markdown``.
-    Per pulizia generica usare le funzioni del modulo ``cleaning``.
+    Le sottoclassi devono implementare ``parse`` e ``clean_markdown``
 
-    Il browser è condiviso tra tutti i parser tramite ``_crawler.get_crawler()``:
-    ogni parser ha solo la propria configurazione di run, non il proprio browser.
+    il browser è condiviso tra tutti i parser tramite ``_crawler.get_crawler()``
 
     Attributes:
         crawler_config: configurazione della run di crawling specifica del parser
@@ -87,8 +81,7 @@ class Parser(ABC):
             url: URL assoluto della pagina da acquisire
 
         Returns:
-            un ``ParsedDocument`` con ``url``, ``domain``, ``title``,
-            ``html_text`` e ``parsed_text``
+            un ``ParsedDocument`` con ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``
 
         Raises:
             CrawlError: se il fetch della pagina fallisce
@@ -96,7 +89,7 @@ class Parser(ABC):
         pass
 
     @abstractmethod
-    def clean_markdown(self, text: str) -> str:
+    def normalize(self, text: str) -> str:
         """Applica pipeline di pulizia specifica rispetto al dominio
 
         Args:

@@ -1,10 +1,10 @@
-from ..utils import strip_markdown
+from ..utils import strip_formatting
 from .eval import Evaluator
 
 class TokenLevelEvaluator(Evaluator):
 
     def evaluate(self, parsed_text: str, gold_text: str) -> dict:
-        tokens_parsed = self._tokenize(strip_markdown(parsed_text))
+        tokens_parsed = self._tokenize(strip_formatting(parsed_text))
         tokens_gold = self._tokenize(gold_text)
         intersection = self._intersection(tokens_parsed, tokens_gold)
 
