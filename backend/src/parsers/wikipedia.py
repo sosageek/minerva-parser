@@ -62,6 +62,8 @@ class WikipediaParser(Parser):
             excluded_selector=(
                 ".mw-navigation, #mw-head, #mw-panel, .navbox, .sidebar, .toc, "
                 ".hatnote, .ambox, .infobox, .shortdescription, .geo-dec, "
+                ".thumb, .tright, .tleft, .mw-file-description, figcaption, "
+                ".gallery, .categorytree, "
                 ".geo-dms, .coordinates, #coordinates, .mw-editsection, .noprint, "
                 ".mwe-math-mathml-a11y"
             ),
@@ -99,7 +101,7 @@ class WikipediaParser(Parser):
         return text
 
     def _remove_footnote_refs(self, text: str) -> str:
-        """Cancella riferimenti a note wiki tra quadre"""
+        """Cancella riferimenti alle note tra quadre"""
         return self._RE_FOOTNOTE_REF.sub('', text)
 
     def _extract_math(self, text: str) -> tuple[str, list[str]]:
@@ -131,7 +133,7 @@ class WikipediaParser(Parser):
         return self._RE_MATH_IMG.sub(stash, text), store
 
     def _restore_math(self, text: str, store: list[str]) -> str:
-        """Ripristina i token delle formule con la relativa sintassi LaTeX tra ``$...$``"""
+        """Ripristina i token delle formule con la relativa sintassi latex tra ``$...$``"""
         return self._RE_MATH_TOKEN.sub(lambda m: f'${store[int(m.group(1))]}$', text)
 
     def _remove_urls(self, text: str) -> str:
