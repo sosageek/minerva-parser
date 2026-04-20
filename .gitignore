@@ -209,5 +209,6 @@ __marimo__/
 .DS_Store
 output.txt
 test_wiki.py
+test_nps.py
 minerva-parser
 tests
