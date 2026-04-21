@@ -3,7 +3,6 @@ from crawl4ai import CrawlerRunConfig, CacheMode
 from .schema import ParsedDocument
 from ._crawler import get_crawler
 
-
 class CrawlError(Exception):
     """Errore di fetch di una pagina web
 

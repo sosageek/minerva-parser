@@ -2,34 +2,32 @@ import re
 from urllib.parse import urlparse, unquote
 from .parser import Parser
 from .schema import ParsedDocument
-from ..utils.cleaning import strip_markdown_syntax, normalize_whitespace
+from ..utils.cleaning import remove_markup, normalize_whitespace
 
 
 class MeteoAmParser(Parser):
 
-    # Sezione "articoli correlati" che può sfuggire all'excluded_selector
+    _EXCLUDED_SELECTORS = (
+        "a.news-details-header-go-back, "
+        "div.news-details-side-col, "
+        "section[data-wcs-title='Potrebbe piacerti anche'], "
+        "section[data-wcs-title='Articoli recenti'], "
+        "section[data-web-app='EditorImageGallery'], "
+        "section[data-web-app='ArticleHeader']"
+    )
+    _TARGET_ELEMENTS = ["section#details_news_page"]
+
     _RE_RELATED = re.compile(
         r'Potrebbe piacerti anche.*',
         re.DOTALL | re.IGNORECASE,
     )
-
-    # Link "← Torna agli articoli" che può apparire come testo nel markdown
     _RE_BACK_LINK = re.compile(r'←\s*Torna agli articoli\s*\n?', re.IGNORECASE)
-
-    # Intestazione della sezione galleria fotografica che sfugge all'excluded_selector
     _RE_GALLERY = re.compile(r'^Galleria Fotografica\s*\n?', re.MULTILINE | re.IGNORECASE)
 
     def __init__(self):
         super().__init__(
-            target_elements=["section#details_news_page"],
-            excluded_selector=(
-                "a.news-details-header-go-back, "
-                "div.news-details-side-col, "
-                "section[data-wcs-title='Potrebbe piacerti anche'], "
-                "section[data-wcs-title='Articoli recenti'], "
-                "section[data-web-app='EditorImageGallery'], "
-                "section[data-web-app='ArticleHeader']"
-            ),
+            excluded_selector=self._EXCLUDED_SELECTORS,
+            target_elements=self._TARGET_ELEMENTS
         )
 
     async def parse(self, url: str) -> ParsedDocument:
@@ -40,19 +38,18 @@ class MeteoAmParser(Parser):
             domain=urlparse(url).netloc,
             title=self._extract_title(url),
             html_text=result.html,
-            parsed_text=self.clean_markdown(result.markdown),
+            parsed_text=self.normalize(result.markdown),
         )
 
-    def clean_markdown(self, text: str) -> str:
+    def normalize(self, text: str) -> str:
         text = self._RE_BACK_LINK.sub('', text)
         text = self._RE_RELATED.sub('', text)
         text = self._RE_GALLERY.sub('', text)
-        text = strip_markdown_syntax(text)
+        text = remove_markup(text)
         text = normalize_whitespace(text)
         return text.strip()
 
     def _extract_title(self, url: str) -> str:
-        slug = unquote(urlparse(url).path.rstrip('/').split('/')[-1])
-        # "--" nei slug meteoam codifica ": " nel titolo originale
-        slug = slug.replace('--', ': ')
+        slug = unquote(urlparse(url).path.rstrip('/').split('/')[-1]) 
+        slug = slug.replace('--', ': ') # "--" negli slug meteoam codifica ": " nel titolo originale
         return slug.replace('-', ' ')

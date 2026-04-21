@@ -13,6 +13,22 @@ class NpsParser(Parser):
     include regole di pulizia specifiche per cancellare breadcrumb vari, modali nascoste sezioni di contatto a fine pagina.
     """
 
+    _EXCLUDED_SELECTORS = (
+        "#modal-contact-us, .visually-hidden, "
+        ".VideoHero, .video-js, .vjs-control-bar, .vjs-menu, "
+        ".vjs-modal-dialog, .vjs-text-track-display, "  
+        "#touchpoints-survey, .touchpoints-form-wrapper, "
+        "#ParkFooter, .ParkFooter, "
+        "div.FeatureGrid, div.ContentPromos, .CaptionedImage, "
+        "figure.-right, figure.-left, figure.-center, "
+        "figcaption, .figcredit, .picture-caption, "
+        ".stateListLinks, .stateThumbnail, "
+        ".parkListServiceLinks, .combinedStats, .finding-park-search, "
+        ".view-filters, .pagination, "             
+        "script, style, noscript, iframe"
+    )
+    _TARGET_ELEMENTS = ["#main", ".MainContent", "[role='main']"]
+
     # potenzialmente inutili con i giusti excluded selectors ma teniamo come safety net 
     # non si sa mai qualche redattore faccia porcherie nell'editor di testo principale
     _RE_TERMINAL_SECTIONS = re.compile(
@@ -21,6 +37,7 @@ class NpsParser(Parser):
         r'|Tools|Downloads?|Last\s+updated|By\s+The\s+Numbers)\s*$',
         re.MULTILINE | re.IGNORECASE,
     )
+
     _RE_LAST_UPDATED = re.compile(r'^\s*Last\s+updated\s*:?.*$', re.MULTILINE | re.IGNORECASE,)
     _RE_TRAILING_ARTIFACTS = re.compile(r'[\s|>\-]+$')
 
@@ -41,21 +58,8 @@ class NpsParser(Parser):
 
     def __init__(self):
             super().__init__(
-                excluded_selector=(
-                    "#modal-contact-us, .visually-hidden, "
-                    ".VideoHero, .video-js, .vjs-control-bar, .vjs-menu, "
-                    ".vjs-modal-dialog, .vjs-text-track-display, "  
-                    "#touchpoints-survey, .touchpoints-form-wrapper, "
-                    "#ParkFooter, .ParkFooter, "
-                    "div.FeatureGrid, div.ContentPromos, .CaptionedImage, "
-                    "figure.-right, figure.-left, figure.-center, "
-                    "figcaption, .figcredit, .picture-caption, "
-                    ".stateListLinks, .stateThumbnail, "
-                    ".parkListServiceLinks, .combinedStats, .finding-park-search, "
-                    ".view-filters, .pagination, "             
-                    "script, style, noscript, iframe"
-                ),
-                target_elements=["#main", ".MainContent", "[role='main']"],
+                excluded_selector=self._EXCLUDED_SELECTORS,
+                target_elements=self._TARGET_ELEMENTS,
             )
 
     async def parse(self, url: str) -> ParsedDocument:
@@ -96,7 +100,7 @@ class NpsParser(Parser):
 
         * preferisce il contenuto del tag ``<title>`` html
         (perché a quanto pare gli url di nps.gov sono opachi a differenza di wikipedia)
-        * rimuove il suffisso ricorrente "(U.S. National Park Service)"
+        * rimuove il suffisso ricorrente (U.S. National Park Service)
 
         se il titolo non è disponibile usa ultimo segmento del path come fallback
         """
