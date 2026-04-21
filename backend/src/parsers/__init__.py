@@ -1,4 +1,4 @@
 from .wikipedia import WikipediaParser
+from .meteoam import MeteoAmParser
 from .nps import NpsParser
-#from .meteoam import MeteoAmParser
 #from .booker import BookerParser
