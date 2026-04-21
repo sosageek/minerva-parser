@@ -1,0 +1,11 @@
+services:
+  backend:
+    build:
+      context: ./backend
+    container_name: minerva-backend
+    ports:
+      - "8003:8003"
+    environment:
+      GS_DATA_DIR: /app/gs_data
+    volumes:
+      - ./gs_data:/app/gs_data
