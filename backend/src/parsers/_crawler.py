@@ -1,6 +1,8 @@
 import asyncio
 from crawl4ai import AsyncWebCrawler, BrowserConfig
 
+from ..config import CRAWLER_HEADLESS
+
 _crawler: AsyncWebCrawler | None = None
 _lock = asyncio.Lock()
 
@@ -13,7 +15,7 @@ async def get_crawler() -> AsyncWebCrawler:
     global _crawler
     async with _lock:
         if _crawler is None:
-            crawler = AsyncWebCrawler(config=BrowserConfig(headless=True))
+            crawler = AsyncWebCrawler(config=BrowserConfig(headless=CRAWLER_HEADLESS))
             await crawler.start()
             _crawler = crawler
     return _crawler

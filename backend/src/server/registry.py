@@ -1,15 +1,9 @@
-from __future__ import annotations
-
 import json
-import os
 from pathlib import Path
 
+from ..config import GS_DATA_DIR
 from ..parsers import MeteoAmParser, NpsParser, WikipediaParser
 from ..parsers.parser import Parser
-
-
-_PROJECT_ROOT = Path(__file__).resolve().parents[3]
-GS_DATA_DIR = Path(os.environ.get("GS_DATA_DIR", _PROJECT_ROOT / "gs_data")) # ovveridable con var d'ambiente del container
 
 PARSERS: dict[str, Parser] = {
     "www.meteoam.it": MeteoAmParser(),
@@ -18,9 +12,9 @@ PARSERS: dict[str, Parser] = {
 }
 
 GS_FILES: dict[str, Path] = {
-    "www.meteoam.it": GS_DATA_DIR / "meteoam.it.json",
+    "www.meteoam.it": GS_DATA_DIR / "www.meteoam.it_gs.json",
     "en.wikipedia.org": GS_DATA_DIR / "en.wikipedia.org_gs.json",
-    "www.nps.gov": GS_DATA_DIR / "nps.gov_gs.json",
+    "www.nps.gov": GS_DATA_DIR / "www.nps.gov_gs.json",
 }
 
 

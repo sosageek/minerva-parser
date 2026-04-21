@@ -4,6 +4,7 @@ from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Query
 
+from ..config import configure_logging
 from ..eval.token_level_eval import TokenLevelEvaluator
 from ..parsers._crawler import close_crawler
 from ..parsers.parser import CrawlError, Parser
@@ -31,9 +32,11 @@ _evaluator = TokenLevelEvaluator()
 async def lifespan(app: FastAPI):
     """Avvio e chiusura del server
 
+    * configura il logging (formato e livello centralizzati in ``config.py``)
     * all'avvio carica in memoria tutti i GS (failfast se manca un file)
     * alla chiusura chiude il crawler condiviso evitando processi zombie
     """
+    configure_logging()
     global _gs_store
     _gs_store = load_gold_standards()
     logger.info(
