@@ -1,8 +1,9 @@
+import html
 import re
 from urllib.parse import urlparse, unquote
 from .parser import Parser
 from .schema import ParsedDocument
-from ..utils.cleaning import strip_markdown_syntax, normalize_whitespace
+from ..utils.cleaning import remove_markup, normalize_whitespace
 
 
 class WikipediaParser(Parser):
@@ -16,6 +17,33 @@ class WikipediaParser(Parser):
 
     _RE_IPA_LINK         = re.compile(r'\[\[([^\]]*)\]\]\([^)]*Help:IPA[^)]*\)')
     _RE_BRACKET_LINK     = re.compile(r'\[\[[^\]]*\]\]\([^)]*\)')
+
+    _RE_FOOTNOTE_REF     = re.compile(
+        r'\[(?:'
+        r'\d{1,3}'
+        r'|[a-z]{1,3}'
+        r'|[*\u2020\u2021\u00a7\u00b6]+'
+        r'|(?:note|nb|n)\s+\d+'
+        r'|citation\s+needed'
+        r'|clarification\s+needed'
+        r'|better\s+source\s+needed'
+        r'|failed\s+verification'
+        r'|original\s+research\??'
+        r'|according\s+to\s+whom\??'
+        r'|dubious(?:\s*[\u2013\u2014\-][^\]]*)?'
+        r'|sic\??'
+        r'|(?:who|when|where|why|which|what|how)\?'
+        r')\](?!\()',
+        re.IGNORECASE,
+    )
+
+    _RE_MATH_IMG           = re.compile(r'!\[((?:[^\]]|\](?!\())*)\]\([^)]*math/render[^)]*\)')
+    _RE_MATH_STYLE_WRAPPER = re.compile(
+        r'^\{\\(?:display|text|script|scriptscript)style\s+(.*)\}$',
+        re.DOTALL,
+    )
+    _RE_MATH_TOKEN         = re.compile(r'§§MATH§§(\d+)§§')
+    _MATH_TOKEN_FORMAT     = '§§MATH§§{}§§'
 
     _RE_URL_WITH_CAPTION = re.compile(r'\(https?://(?:[^\s)\\]|\\.)+\)(?=\S)\S*')
     _RE_URL_PAREN        = re.compile(r'\(https?://(?:[^\s)\\]|\\.)+\)')
@@ -34,8 +62,10 @@ class WikipediaParser(Parser):
             excluded_selector=(
                 ".mw-navigation, #mw-head, #mw-panel, .navbox, .sidebar, .toc, "
                 ".hatnote, .ambox, .infobox, .shortdescription, .geo-dec, "
-                ".geo-dms, .coordinates, #coordinates, "
-                ".mw-editsection"
+                ".thumb, .tright, .tleft, .mw-file-description, figcaption, "
+                ".gallery, .categorytree, "
+                ".geo-dms, .coordinates, #coordinates, .mw-editsection, .noprint, "
+                ".mwe-math-mathml-a11y"
             ),
             target_elements=["#mw-content-text"],
         )
@@ -49,16 +79,19 @@ class WikipediaParser(Parser):
             domain=urlparse(final_url).netloc,
             title=self._extract_title(final_url),
             html_text=result.cleaned_html,
-            parsed_text=self.clean_markdown(result.markdown),
+            parsed_text=self.normalize(result.markdown),
         )
 
-    def clean_markdown(self, text: str) -> str:
+    def normalize(self, text: str) -> str:
         text = self._truncate_terminal_sections(text)
         text = self._normalize_wiki_links(text)
-        text = strip_markdown_syntax(text)
+        text = self._remove_footnote_refs(text)
+        text, math_store = self._extract_math(text)
+        text = remove_markup(text)
         text = self._remove_urls(text)
         text = self._remove_wiki_metadata(text)
         text = normalize_whitespace(text)
+        text = self._restore_math(text, math_store)
         return text.strip()
 
     def _normalize_wiki_links(self, text: str) -> str:
@@ -66,6 +99,42 @@ class WikipediaParser(Parser):
         text = self._RE_IPA_LINK.sub(r'/\1/', text)
         text = self._RE_BRACKET_LINK.sub('', text)
         return text
+
+    def _remove_footnote_refs(self, text: str) -> str:
+        """Cancella riferimenti alle note tra quadre"""
+        return self._RE_FOOTNOTE_REF.sub('', text)
+
+    def _extract_math(self, text: str) -> tuple[str, list[str]]:
+        """Estrae formule matematiche da immagini renderizzate da wiki
+
+        le formule vengono sostituite da token opachi ``§§MATH§§N§§`` in modo che la pipeline generica non le tocchi
+        
+        latex viene ricostruito da ``_restore_math`` a valle di ``normalize_whitespace``
+
+        wrapper di rendering tipo ``{\\displaystyle ...}`` vengono scartati (no contenuto semantico)
+
+        Args:
+            text: markdown contenente immagini ``![LATEX](...)``
+
+        Returns:
+            coppia ``(testo con token al posto delle formule, lista dei LaTeX estratti)``
+        """
+        store: list[str] = []
+
+        def stash(m: re.Match) -> str:
+            latex = html.unescape(m.group(1))
+            latex = latex.replace('\\\\', '\\')
+            unwrapped = self._RE_MATH_STYLE_WRAPPER.match(latex)
+            if unwrapped:
+                latex = unwrapped.group(1).strip()
+            store.append(latex)
+            return self._MATH_TOKEN_FORMAT.format(len(store) - 1)
+
+        return self._RE_MATH_IMG.sub(stash, text), store
+
+    def _restore_math(self, text: str, store: list[str]) -> str:
+        """Ripristina i token delle formule con la relativa sintassi latex tra ``$...$``"""
+        return self._RE_MATH_TOKEN.sub(lambda m: f'${store[int(m.group(1))]}$', text)
 
     def _remove_urls(self, text: str) -> str:
         """Cancella URL (anche tra parentesi con eventuali caption)"""

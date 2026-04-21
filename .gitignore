@@ -210,6 +210,7 @@ __marimo__/
 output.txt
 test_wiki.py
 test_meteoam.py
+test_nps.py
 minerva-parser
 .claude/
 tests

@@ -1,37 +1,13 @@
-"""Utility di pulizia del markdown
-
-funzioni pure stringa -> stringa
-indipendenti dalla gerarchia ``Parser``
-
-interfacce:
-    ``strip_markdown_syntax``: rimuove sintassi markdown e html residuo
-    ``normalize_whitespace``:  normalizza spazi/tab e newline
-"""
-
 import html
 import re
-
-_FOOTNOTE_CONTENT = (
-    r'\d{1,3}'
-    r'|[a-z]{1,3}'
-    r'|[*\u2020\u2021\u00a7\u00b6]+'
-    r'|(?:note|nb|n)\s+\d+'
-    r'|citation\s+needed'
-    r'|clarification\s+needed'
-    r'|better\s+source\s+needed'
-    r'|failed\s+verification'
-    r'|original\s+research\??'
-    r'|according\s+to\s+whom\??'
-    r'|dubious(?:\s*[\u2013\u2014\-][^\]]*)?'
-    r'|sic\??'
-    r'|(?:who|when|where|why|which|what|how)\?'
-)
 
 _RE_IMAGE       = re.compile(r'!\[[^\]]*\]\((?:[^()]*|\([^()]*\))*\)')
 _RE_LINK        = re.compile(r'\[([^\]]*)\]\((?:[^()]*|\([^()]*\))*\)')
 _RE_REF_LINK    = re.compile(r'\[([^\]]+)\]\[[^\]]*\]')
 _RE_REF_DEF     = re.compile(r'^\[[^\]]+\]:\s+\S+.*$', re.MULTILINE)
-_RE_ORPHAN_BR   = re.compile(rf'\[(?:{_FOOTNOTE_CONTENT})\]', re.IGNORECASE)
+
+_RE_FENCED_CODE = re.compile(r'^```[^\n]*\n(.*?)\n```[ \t]*$', re.MULTILINE | re.DOTALL)
+_RE_INLINE_CODE = re.compile(r'`([^`\n]+)`')
 
 _RE_TABLE_ROW   = re.compile(r'^\|.*\|\s*$', re.MULTILINE)
 _RE_TABLE_SEP   = re.compile(r'^[|:\-\s]+$', re.MULTILINE)
@@ -45,11 +21,12 @@ _RE_TRAIL_WS    = re.compile(r'[ \t]+\n')
 _RE_MULTI_NL    = re.compile(r'\n{3,}')
 
 
-def strip_markdown_syntax(text: str) -> str:
+def remove_markup(text: str) -> str:
     """Pulisce la sintassi markdown/html irrilevante
 
-    * cancella ``![alt](url)``, ``[id]:``, ``[...]``, righe di tabella md, tag HTML e commenti, quadre spaiate
+    * cancella ``![alt](url)``, ``[id]:``, righe di tabella md, tag HTML e commenti, quadre spaiate
     * sostituisce ``[testo](url)``, ``[testo][id]`` con solo testo
+    * preserva il contenuto di snippet di codice (fenced ``` e inline ``` ` ```) rimuovendone i delimitatori
 
     Args:
         text: markdown grezzo
@@ -57,11 +34,12 @@ def strip_markdown_syntax(text: str) -> str:
     Returns:
         il testo privato senza markdown e html (spazi e newline non normalizzati)
     """
+    text = _RE_FENCED_CODE.sub(r'\1', text)
+    text = _RE_INLINE_CODE.sub(r'\1', text)
     text = _RE_IMAGE.sub('', text)
     text = _RE_LINK.sub(r'\1', text)
     text = _RE_REF_LINK.sub(r'\1', text)
     text = _RE_REF_DEF.sub('', text)
-    text = _RE_ORPHAN_BR.sub('', text)
     text = _RE_TABLE_ROW.sub('', text)
     text = _RE_TABLE_SEP.sub('', text)
     text = _RE_HTML_TAG.sub('', text)
