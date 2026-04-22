@@ -15,6 +15,7 @@ from .models import (
     GSEntry,
     ListGSEntry,
     ParseEvaluation,
+    ParseInput,
     ParseOutput,
     SupportedDomains,
     TokenLevelEval,
@@ -91,7 +92,7 @@ def _require_parser(domain: str) -> Parser:
     if parser is None:
         raise HTTPException(
             status_code=400,
-            detail=f"domain '{domain}' not supported",
+            detail=f"domain {domain} not supported",
         )
     return parser
 
@@ -108,15 +109,19 @@ def _require_supported_domain(domain: str) -> None:
     if domain not in PARSERS:
         raise HTTPException(
             status_code=400,
-            detail=f"domain '{domain}' not supported",
+            detail=f"domain {domain} not supported",
         )
 
 
-async def _do_parse(url: str) -> ParsedDocument:
+async def _do_parse(url: str, html_text: str | None = None) -> ParsedDocument:
     """Esegue il parsing di un URL scegliendo il parser in base al dominio
+
+    se ``html_text`` è fornito il parser processa direttamente quell'html senza effettuare una richiesta di rete: 
+    l'URL viene comunque usato per individuare il parser giusto
 
     Args:
         url: URL assoluto
+        html_text: HTML già scaricato dal client (opzionale)
 
     Returns:
         ``ParsedDocument``
@@ -128,7 +133,7 @@ async def _do_parse(url: str) -> ParsedDocument:
     domain = _extract_domain(url)
     parser = _require_parser(domain)
     try:
-        return await parser.parse(url)
+        return await parser.parse(url, raw_html=html_text)
     except CrawlError as err:
         logger.warning("crawl fallito per %s: %s", url, err)
         raise HTTPException(status_code=502, detail=f"unreachable URL: {url}") from err
@@ -185,6 +190,26 @@ async def parse(url: str = Query(..., description="URL assoluto da parsare")) ->
     return ParseOutput(**doc.model_dump())
 
 
+@app.post("/parse", response_model=ParseOutput)
+async def parse_html(payload: ParseInput) -> ParseOutput:
+    """Esegue il parser appropriato su un HTML fornito dal client
+
+    a differenza di GET /parse non viene fatta alcuna richiesta di rete
+
+    Args:
+        payload: body con ``url`` (usato per selezionare il parser) e ``html_text``
+
+    Returns:
+        ``ParseOutput`` con ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``
+
+    Raises:
+        HTTPException(400): dominio non supportato o URL malformato
+        HTTPException(422): body mancante o invalido (gestito da FastAPI)
+    """
+    doc = await _do_parse(payload.url, html_text=payload.html_text)
+    return ParseOutput(**doc.model_dump())
+
+
 @app.get("/domains", response_model=SupportedDomains)
 def domains() -> SupportedDomains:
     """Lista dei domini supportati dal sistema"""
@@ -192,7 +217,7 @@ def domains() -> SupportedDomains:
 
 
 @app.get("/gold_standard", response_model=GSEntry)
-def gold_standard(url: str = Query(..., description="URL presente nel GS")) -> GSEntry:
+def gold_standard(url: str = Query(..., description="URL presente nel gold standard")) -> GSEntry:
     """Entry del GS per l'url dato
 
     Raises:
@@ -265,7 +290,6 @@ async def full_gs_eval(
         try:
             doc = await _do_parse(url)
         except HTTPException as err:
-            # 502 su singolo URL non blocca l'aggregazione: lo registriamo e proseguiamo
             logger.warning("full_gs_eval: skip %s (%s)", url, err.detail)
             failed.append(url)
             continue
@@ -280,7 +304,7 @@ async def full_gs_eval(
     if not precisions:
         raise HTTPException(
             status_code=502,
-            detail=f"all {len(entries)} URLs in GS for '{domain}' failed to parse",
+            detail=f"all {len(entries)} URLs in gold standard for {domain} failed to parse",
         )
 
     n = len(precisions)

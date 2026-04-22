@@ -10,7 +10,7 @@ class NpsParser(Parser):
 
     isola il contenuto gold effettivo ignorando l'interfaccia pesante del cms(?)
 
-    include regole di pulizia specifiche per cancellare breadcrumb vari, modali nascoste sezioni di contatto a fine pagina.
+    include regole di pulizia specifiche per cancellare breadcrumb vari, modali nascoste sezioni di contatto a fine pagina
     """
 
     _EXCLUDED_SELECTORS = (
@@ -62,9 +62,9 @@ class NpsParser(Parser):
                 target_elements=self._TARGET_ELEMENTS,
             )
 
-    async def parse(self, url: str) -> ParsedDocument:
-        result = await self._fetch(url)
-        final_url = getattr(result, "url", None) or url
+    async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
+        result = await self._fetch(url, raw_html=raw_html)
+        final_url = url if raw_html is not None else (getattr(result, "url", None) or url)
 
         return ParsedDocument(
             url=final_url,
@@ -100,7 +100,7 @@ class NpsParser(Parser):
 
         * preferisce il contenuto del tag ``<title>`` html
         (perché a quanto pare gli url di nps.gov sono opachi a differenza di wikipedia)
-        * rimuove il suffisso ricorrente (U.S. National Park Service)
+        * rimuove il suffisso ricorrente U.S. National Park Service
 
         se il titolo non è disponibile usa ultimo segmento del path come fallback
         """

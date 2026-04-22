@@ -75,9 +75,9 @@ class WikipediaParser(Parser):
             target_elements=self._TARGET_ELEMENTS,
         )
 
-    async def parse(self, url: str) -> ParsedDocument:
-        result = await self._fetch(url)
-        final_url = getattr(result, "url", None) or url
+    async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
+        result = await self._fetch(url, raw_html=raw_html)
+        final_url = url if raw_html is not None else (getattr(result, "url", None) or url)
 
         return ParsedDocument(
             url=final_url,

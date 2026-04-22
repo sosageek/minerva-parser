@@ -1,8 +1,23 @@
 from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
+class ParseInput(BaseModel):
+    """Body di POST /parse
+
+    Attributes:
+        url: URL sorgente (serve a dedurre il dominio e quindi il parser da usare)
+        html_text: HTML già scaricato dal client, sul quale il parser lavora
+            senza effettuare una nuova richiesta di rete
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+    html_text: str
+
+
 class ParseOutput(BaseModel):
-    """Output di GET /parse
+    """Output di GET /parse e POST /parse
 
     Attributes:
         url: URL sorgente documento parsato

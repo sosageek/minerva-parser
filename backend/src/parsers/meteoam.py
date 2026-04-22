@@ -30,8 +30,8 @@ class MeteoAmParser(Parser):
             target_elements=self._TARGET_ELEMENTS
         )
 
-    async def parse(self, url: str) -> ParsedDocument:
-        result = await self._fetch(url)
+    async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
+        result = await self._fetch(url, raw_html=raw_html)
 
         return ParsedDocument(
             url=url,
