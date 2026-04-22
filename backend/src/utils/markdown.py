@@ -1,6 +1,5 @@
 import re
 
-
 _RE_HEADING        = re.compile(r'^#{1,6}\s+', re.MULTILINE)
 _RE_HORIZ_RULE     = re.compile(r'^[-*_]{3,}\s*$', re.MULTILINE)
 
@@ -15,6 +14,9 @@ _RE_ITALIC_UND      = re.compile(r'_([^_\n]+)_')
 _RE_MULTI_SPACE    = re.compile(r'[ \t]+')
 _RE_MULTI_NL       = re.compile(r'\n{3,}')
 
+_RE_LIST_MARKERS   = re.compile(r'^[ \t]*[*\-•+][ \t]+', re.MULTILINE)
+_RE_BLOCKQUOTE     = re.compile(r'^[ \t]*>[ \t]*', re.MULTILINE)
+
 
 def strip_formatting(text: str) -> str:
     """Rimuove formattazione markdown
@@ -25,6 +27,9 @@ def strip_formatting(text: str) -> str:
     Returns:
         plain text
     """
+    text = text.replace('\xa0', ' ')
+    text = _RE_LIST_MARKERS.sub('', text)
+    text = _RE_BLOCKQUOTE.sub('', text)
     text = _RE_HEADING.sub('', text)
     text = _RE_BOLD_ITALIC_AST.sub(r'\1', text)
     text = _RE_BOLD_AST.sub(r'\1', text)

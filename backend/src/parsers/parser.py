@@ -3,7 +3,6 @@ from crawl4ai import CrawlerRunConfig, CacheMode
 from .schema import ParsedDocument
 from ._crawler import get_crawler
 
-
 class CrawlError(Exception):
     """Errore di fetch di una pagina web
 
@@ -51,11 +50,15 @@ class Parser(ABC):
             target_elements=target_elements or [],
         )
 
-    async def _fetch(self, url: str):
-        """Scarica una pagina usando il crawler condiviso
+    async def _fetch(self, url: str, raw_html: str | None = None):
+        """Acquisisce una pagina usando il crawler condiviso
+
+        se ``raw_html`` è fornito non viene effettuata nessuna richiesta di rete: 
+        crawl4ai processa direttamente l'HTML passato (prefisso ``raw:``)
 
         Args:
-            url: URL assoluto della pagina
+            url: URL assoluto della pagina (usato per logging e messaggi d'errore)
+            raw_html: HTML già scaricato lato client
 
         Returns:
             un ``CrawlResult`` di crawl4ai con ``success=True``
@@ -64,7 +67,8 @@ class Parser(ABC):
             CrawlError: se il crawler ritorna ``success=False``
         """
         crawler = await get_crawler()
-        result = await crawler.arun(url=url, config=self.crawler_config)
+        fetch_target = f"raw:{raw_html}" if raw_html is not None else url
+        result = await crawler.arun(url=fetch_target, config=self.crawler_config)
         if not result.success:
             raise CrawlError(
                 url=url,
@@ -74,11 +78,12 @@ class Parser(ABC):
         return result
 
     @abstractmethod
-    async def parse(self, url: str) -> ParsedDocument:
-        """Scarica la pagina e ne estrae il markdown pulito
+    async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
+        """Acquisisce la pagina e ne estrae il markdown pulito
 
         Args:
-            url: URL assoluto della pagina da acquisire
+            url: URL assoluto della pagina
+            raw_html: se fornito, l'HTML viene processato senza crawl di rete
 
         Returns:
             un ``ParsedDocument`` con ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``

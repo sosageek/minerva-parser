@@ -8,6 +8,18 @@ from ..utils.cleaning import remove_markup, normalize_whitespace
 
 class WikipediaParser(Parser):
 
+    _EXCLUDED_SELECTORS = (
+        ".mw-navigation, #mw-head, #mw-panel, .navbox, .sidebar, .toc, "
+        ".hatnote, .ambox, .infobox, .shortdescription, .geo-dec, "
+        ".thumb, .tright, .tleft, .mw-file-description, figcaption, "
+        ".gallery, .categorytree, .geo-dms, .coordinates, #coordinates, "
+        ".mw-editsection, .noprint, .mwe-math-mathml-a11y"
+    )
+    _TARGET_ELEMENTS = ["#mw-content-text"]
+
+    # wikipedia ha un sacco di contenuto non semantico non rimuovibile con excluded selectors -> uso massiccio di regex
+    # forse possiamo usare beautifulsoup per sfoltire il codice ma eviterei avere troppo bloat tra le dipendenze (gabriele)
+
     _RE_TERMINAL_SECTIONS = re.compile(
         r'^#{1,6}\s+(?:Notes|References|Bibliography|See also|Further reading'
         r'|External links|Categories|Career statistics|Honours|Honors|Awards'
@@ -42,7 +54,7 @@ class WikipediaParser(Parser):
         r'^\{\\(?:display|text|script|scriptscript)style\s+(.*)\}$',
         re.DOTALL,
     )
-    _RE_MATH_TOKEN         = re.compile(r'§§MATH§§(\d+)§§')
+    _RE_MATH_TOKEN         = re.compile(r'§§MATH§§(\d+)§§') # token opaco per espressioni latex
     _MATH_TOKEN_FORMAT     = '§§MATH§§{}§§'
 
     _RE_URL_WITH_CAPTION = re.compile(r'\(https?://(?:[^\s)\\]|\\.)+\)(?=\S)\S*')
@@ -59,18 +71,13 @@ class WikipediaParser(Parser):
 
     def __init__(self):
         super().__init__(
-            excluded_selector=(
-                ".mw-navigation, #mw-head, #mw-panel, .navbox, .sidebar, .toc, "
-                ".hatnote, .ambox, .infobox, .shortdescription, .geo-dec, "
-                ".geo-dms, .coordinates, #coordinates, .mw-editsection, .noprint, "
-                ".mwe-math-mathml-a11y"
-            ),
-            target_elements=["#mw-content-text"],
+            excluded_selector=self._EXCLUDED_SELECTORS,
+            target_elements=self._TARGET_ELEMENTS,
         )
 
-    async def parse(self, url: str) -> ParsedDocument:
-        result = await self._fetch(url)
-        final_url = getattr(result, "url", None) or url
+    async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
+        result = await self._fetch(url, raw_html=raw_html)
+        final_url = url if raw_html is not None else (getattr(result, "url", None) or url)
 
         return ParsedDocument(
             url=final_url,
@@ -99,17 +106,15 @@ class WikipediaParser(Parser):
         return text
 
     def _remove_footnote_refs(self, text: str) -> str:
-        """Cancella riferimenti a note wiki tra quadre"""
+        """Cancella riferimenti alle note tra quadre"""
         return self._RE_FOOTNOTE_REF.sub('', text)
 
     def _extract_math(self, text: str) -> tuple[str, list[str]]:
         """Estrae formule matematiche da immagini renderizzate da wiki
 
-        le formule vengono sostituite da token opachi ``§§MATH§§N§§`` in modo che la pipeline generica non le tocchi
-        
-        latex viene ricostruito da ``_restore_math`` a valle di ``normalize_whitespace``
-
-        wrapper di rendering tipo ``{\\displaystyle ...}`` vengono scartati (no contenuto semantico)
+        * le formule vengono sostituite da token opachi ``§§MATH§§N§§`` in modo che la pipeline generica non le tocchi
+        * latex viene ricostruito da ``_restore_math`` a valle di ``normalize_whitespace``
+        * istruzioni di rendering tipo ``{\\displaystyle ...}`` vengono scartate
 
         Args:
             text: markdown contenente immagini ``![LATEX](...)``
@@ -131,7 +136,7 @@ class WikipediaParser(Parser):
         return self._RE_MATH_IMG.sub(stash, text), store
 
     def _restore_math(self, text: str, store: list[str]) -> str:
-        """Ripristina i token delle formule con la relativa sintassi LaTeX tra ``$...$``"""
+        """Ripristina i token delle formule con la relativa sintassi latex tra ``$...$``"""
         return self._RE_MATH_TOKEN.sub(lambda m: f'${store[int(m.group(1))]}$', text)
 
     def _remove_urls(self, text: str) -> str:
