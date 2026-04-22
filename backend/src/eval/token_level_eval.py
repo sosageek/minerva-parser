@@ -1,3 +1,5 @@
+import re
+
 from .eval import Evaluator
 
 class TokenLevelEvaluator(Evaluator):
@@ -6,6 +8,10 @@ class TokenLevelEvaluator(Evaluator):
     si aspetta due stringhe di plain text
     (quindi è responsabilità del caller rimuovere sintassi md prima di passare argomenti)
     """
+
+    # \w+ con flag Unicode: cattura lettere accentate (è, à, ù, ...) e scarta la punteggiatura
+    _WORD_RE = re.compile(r"\w+", re.UNICODE)
+
     def evaluate(self, parsed_text: str, gold_text: str) -> dict:
         tokens_parsed = self._tokenize(parsed_text)
         tokens_gold = self._tokenize(gold_text)
@@ -18,7 +24,7 @@ class TokenLevelEvaluator(Evaluator):
         }
 
     def _tokenize(self, text: str) -> set:
-        return set(text.lower().split())
+        return set(self._WORD_RE.findall(text.lower()))
 
     def _intersection(self, a: set, b: set) -> set:
         return a & b
