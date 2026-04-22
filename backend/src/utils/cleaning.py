@@ -9,7 +9,7 @@ _RE_REF_DEF     = re.compile(r'^\[[^\]]+\]:\s+\S+.*$', re.MULTILINE)
 _RE_FENCED_CODE = re.compile(r'^```[^\n]*\n(.*?)\n```[ \t]*$', re.MULTILINE | re.DOTALL)
 _RE_INLINE_CODE = re.compile(r'`([^`\n]+)`')
 
-_RE_TABLE_ROW   = re.compile(r'^\|.*\|$', re.MULTILINE)
+_RE_TABLE_ROW   = re.compile(r'^\|.*\|\s*$', re.MULTILINE)
 _RE_TABLE_SEP   = re.compile(r'^[|:\-\s]+$', re.MULTILINE)
 
 _RE_HTML_TAG    = re.compile(r'<(?:!--.*?--|/?[a-zA-Z][^<>]*)>', re.DOTALL)
