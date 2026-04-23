@@ -24,9 +24,9 @@ _RE_MULTI_NL    = re.compile(r'\n{3,}')
 def remove_markup(text: str) -> str:
     """Pulisce la sintassi markdown/html irrilevante
 
-    * cancella ``![alt](url)``, ``[id]:``, righe di tabella md, tag HTML e commenti, quadre spaiate
+    * cancella ``![alt](url)``, ``[id]:``, righe di tabella md, tag HTML/commenti, quadre spaiate
     * sostituisce ``[testo](url)``, ``[testo][id]`` con solo testo
-    * preserva il contenuto di snippet di codice (fenced ``` e inline ``` ` ```) rimuovendone i delimitatori
+    * preserva il contenuto di snippet di codice senza delimitatori
 
     Args:
         text: markdown grezzo

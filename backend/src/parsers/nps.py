@@ -15,37 +15,47 @@ class NpsParser(Parser):
 
     _EXCLUDED_SELECTORS = (
         "#modal-contact-us, .visually-hidden, "
-        ".VideoHero, .video-js, .vjs-control-bar, .vjs-menu, "
-        ".vjs-modal-dialog, .vjs-text-track-display, "  
+        ".VideoHero, .video-js, .vjs-control-bar, .vjs-menu, .vjs-modal-dialog, .vjs-text-track-display, "
         "#touchpoints-survey, .touchpoints-form-wrapper, "
+        "#back_button_container, .return-button, "
         "#ParkFooter, .ParkFooter, "
-        "div.FeatureGrid, div.ContentPromos, .CaptionedImage, "
-        "figure.-right, figure.-left, figure.-center, "
-        "figcaption, .figcredit, .picture-caption, "
-        ".stateListLinks, .stateThumbnail, "
-        ".parkListServiceLinks, .combinedStats, .finding-park-search, "
-        ".view-filters, .pagination, "             
+        "#CS_Element_FeatureContainer, .ContentPromos, .CarouselGallery, .RelatedGrid, .CS_Element_Layout .FeatureGrid, "
+        ".CaptionedImage, figure.-right, figure.-left, figure.-center, figcaption, .figcredit, .picture-caption, "
+        ".stateListLinks, .stateThumbnail, .parkListServiceLinks, .combinedStats, .finding-park-search, "
+        ".view-filters, .pagination, .SharedContentTags, .info-micro-filter, .ListingResults-loading, .FilterTags, .ResultsFooter, .resultsPaginationArea, #nps-calendar, "
+        "img, picture, svg, "
         "script, style, noscript, iframe"
     )
     _TARGET_ELEMENTS = ["#main", ".MainContent", "[role='main']"]
 
     # potenzialmente inutili con i giusti excluded selectors ma teniamo come safety net 
     # non si sa mai qualche redattore faccia porcherie nell'editor di testo principale
+    # edit: lo fanno (gabriele)
     _RE_TERMINAL_SECTIONS = re.compile(
         r'^#{1,6}\s+(?:Contact\s+Us|Contact\s+the\s+Park'
-        r'|Stay\s+Connected|Related\s+Links|More\s+Information'
-        r'|Tools|Downloads?|Last\s+updated|By\s+The\s+Numbers)\s*$',
+        r'|Stay\s+Connected|Related\s+Links|(?:For\s+)?More\s+Information'
+        r'|Tools|Downloads?|Last\s+updated|By\s+The\s+Numbers'
+        r'|_*Tags?|You\s+Might\s+Also\s+Like|Calendar\s+of\s+Events)\s*$',
         re.MULTILINE | re.IGNORECASE,
     )
 
     _RE_LAST_UPDATED = re.compile(r'^\s*Last\s+updated\s*:?.*$', re.MULTILINE | re.IGNORECASE,)
+    _RE_INLINE_TAGS = re.compile(r'^\s*Tags\s*:.*$', re.MULTILINE | re.IGNORECASE)
     _RE_TRAILING_ARTIFACTS = re.compile(r'[\s|>\-]+$')
+    _RE_FUSED_HEADING = re.compile(r'(?<=\S)(#{1,6})\s*')
+    
+    _RE_JUNK_PROMOS = re.compile( # le inseriscono anche come plain text nei paragrafi, non hanno pudore
+        r'^\s*#*\s*(?:Follow\s+Us\s+on\s+Social\s+Media|Download\s+the\s+NPS\s+App).*\n.*\n?', 
+        re.MULTILINE | re.IGNORECASE
+    )
+    _RE_VIEW_DETAILS = re.compile(r'^\s*View\s+Details\s*$', re.MULTILINE | re.IGNORECASE)
+    _RE_STRAY_HASH = re.compile(r'\s+#+\s*$', re.MULTILINE)
 
     _RE_URL_PAREN = re.compile(r'\(https?://(?:[^\s)\\]|\\.)+\)')
     _RE_URL_BARE  = re.compile(r'https?://(?:[^\s)\\]|\\.)*[^\s)\\.,;:!?]')
 
     _RE_IMAGE_ALT = re.compile(r'^!.*$', re.MULTILINE)
-    _RE_SYMBOL_ONLY_LINE = re.compile(r'^[\s\ufeff/;.,\-\d]+$', re.MULTILINE)
+    _RE_SYMBOL_ONLY_LINE = re.compile(r'^[\s\ufeff/;.,\-\d\[\]]+$', re.MULTILINE)
 
     _RE_TITLE_SUFFIX = re.compile(
         r'\s*[-–|]\s*\(?\s*U\.?S\.?\s+National\s+Park\s+Service\)?\s*$',
@@ -77,9 +87,14 @@ class NpsParser(Parser):
     def normalize(self, text: str) -> str:
         text = self._truncate_terminal_sections(text)
         text = self._RE_LAST_UPDATED.sub('', text)
+        text = self._RE_INLINE_TAGS.sub('', text)
         text = self._RE_IMAGE_ALT.sub('', text)
+        text = self._RE_FUSED_HEADING.sub(r'\n\1 ', text)
         text = self._remove_urls(text)
         text = remove_markup(text)
+        text = self._RE_JUNK_PROMOS.sub('', text)
+        text = self._RE_VIEW_DETAILS.sub('', text)
+        text = self._RE_STRAY_HASH.sub('', text)
         text = self._RE_SYMBOL_ONLY_LINE.sub('', text)
         text = self._RE_TRAILING_ARTIFACTS.sub('', text)
         text = normalize_whitespace(text)
