@@ -15,7 +15,7 @@ class WikipediaParser(Parser):
 
     gli excluded selectors vengono applicati in preprocessing via beautiful soup (non crawl4ai) per proteggere i tail text degli inline
     
-    include regole di pulizia specifiche per link IPA, note a fine di pagina, formule LaTeX renderizzate come immagini, e taglio alle sezioni terminali
+    include regole di pulizia specifiche per link IPA, note a fine di pagina, formule latex renderizzate come immagini, e taglio alle sezioni terminali
     """
 
     # da passare a beautiful soup non a crawl4ai!!!
