@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 from fastapi import FastAPI, HTTPException, Query
 
 from ..config import configure_logging
+from ..eval.chrf_eval import ChrFEvaluator
 from ..eval.token_level_eval import TokenLevelEvaluator
 from ..parsers._crawler import close_crawler
 from ..parsers.parser import CrawlError, Parser
@@ -27,6 +28,7 @@ logger = logging.getLogger("minerva-parser.api")
 
 _gs_store: dict[str, list[dict]] = {}
 _evaluator = TokenLevelEvaluator()
+_chrf = ChrFEvaluator()
 
 
 @asynccontextmanager
@@ -160,15 +162,22 @@ def _prepare_for_eval(text: str) -> str:
 def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
     """Calcola le metriche di evaluation per una coppia (parsed, gold)
 
+    * ``token_level_eval`` (obbligatorio): precision, recall, f1
+    * ``x_eval``: metriche accessorie — ``chrf`` e ``noise_ratio``
+
     Returns:
         ``ParseEvaluation`` con ``token_level_eval`` e ``x_eval``
     """
     parsed_clean = _prepare_for_eval(parsed_text)
     gold_clean = _prepare_for_eval(gold_text)
     token_metrics = _evaluator.evaluate(parsed_clean, gold_clean)
+    x_eval = {
+        "chrf": _chrf.evaluate(parsed_clean, gold_clean),
+        "noise_ratio": _evaluator.noise_ratio(parsed_clean, gold_clean),
+    }
     return ParseEvaluation(
         token_level_eval=TokenLevelEval(**token_metrics),
-        x_eval={},
+        x_eval=x_eval,
     )
 
 
@@ -283,6 +292,8 @@ async def full_gs_eval(
     precisions: list[float] = []
     recalls: list[float] = []
     f1s: list[float] = []
+    chrfs: list[float] = []
+    noise_ratios: list[float] = []
     failed: list[str] = []
 
     for entry in entries:
@@ -300,6 +311,8 @@ async def full_gs_eval(
         precisions.append(metrics["precision"])
         recalls.append(metrics["recall"])
         f1s.append(metrics["f1"])
+        chrfs.append(_chrf.evaluate(parsed_clean, gold_clean))
+        noise_ratios.append(_evaluator.noise_ratio(parsed_clean, gold_clean))
 
     if not precisions:
         raise HTTPException(
@@ -313,7 +326,12 @@ async def full_gs_eval(
         recall=round(sum(recalls) / n, 4),
         f1=round(sum(f1s) / n, 4),
     )
-    x_eval: dict = {"n_evaluated": n, "n_total": len(entries)}
+    x_eval: dict = {
+        "n_evaluated": n,
+        "n_total": len(entries),
+        "chrf": round(sum(chrfs) / n, 4),
+        "noise_ratio": round(sum(noise_ratios) / n, 4),
+    }
     if failed:
         x_eval["failed_urls"] = failed
     return ParseEvaluation(token_level_eval=aggregated, x_eval=x_eval)
