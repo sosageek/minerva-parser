@@ -2,3 +2,4 @@ crawl4ai>=0.8
 pydantic>=2.0
 fastapi>=0.110
 uvicorn[standard]>=0.27
+sacrebleu>=2.4
