@@ -12,7 +12,7 @@ class BookerParser(Parser):
       #di eliminare blocchi interi di caroselli di immagini7video, link affiliati, e varia pubblicita 
       #semplificando il codice 
 
-    _TARGET_ELEMENTS = ["main", "main-", ]
+    _TARGET_ELEMENTS = ["main", "main-page-content"]
 
     _EXCLUDED_SELECTORS = (
         "nav, footer, header, aside, figcaption,"
