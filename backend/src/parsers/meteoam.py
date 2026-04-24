@@ -7,6 +7,8 @@ from ..utils.cleaning import remove_markup, normalize_whitespace
 
 class MeteoAmParser(Parser):
 
+# ---------------------------------- SELETTORI ----------------------------------
+
     _EXCLUDED_SELECTORS = (
         "a.news-details-header-go-back, "
         "div.news-details-side-col, "
@@ -16,6 +18,8 @@ class MeteoAmParser(Parser):
         "section[data-web-app='ArticleHeader']"
     )
     _TARGET_ELEMENTS = ["section#details_news_page"]
+
+# ------------------------------------ REGEX -------------------------------------
 
     _RE_RELATED = re.compile(
         r'Potrebbe piacerti anche.*',
@@ -29,6 +33,8 @@ class MeteoAmParser(Parser):
             excluded_selector=self._EXCLUDED_SELECTORS,
             target_elements=self._TARGET_ELEMENTS
         )
+
+# ---------------------------------- METODI PUBBLICI ----------------------------------
 
     async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
         result = await self._fetch(url, raw_html=raw_html)
@@ -48,6 +54,8 @@ class MeteoAmParser(Parser):
         text = remove_markup(text)
         text = normalize_whitespace(text)
         return text.strip()
+    
+# ---------------------------------- HELPER PRIVATI ----------------------------------
 
     def _extract_title(self, url: str) -> str:
         slug = unquote(urlparse(url).path.rstrip('/').split('/')[-1]) 

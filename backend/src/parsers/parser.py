@@ -31,16 +31,17 @@ class Parser(ABC):
     il browser è condiviso tra tutti i parser tramite ``_crawler.get_crawler()``
 
     Attributes:
-        crawler_config: configurazione della run di crawling specifica del parser
+        crawler_config(CrawlerRunConfig): configurazione della run di crawling specifica del parser
     """
 
     def __init__(self, excluded_selector: str = "", target_elements: list[str] | None = None):
         """Inizializza la configurazione della run di crawling
 
         Args:
-            excluded_selector: selettore CSS con gli elementi da escludere
-            target_elements: lista di selettori CSS su cui restringere l'estrazione
+            excluded_selector(str): selettore CSS con gli elementi da escludere
+            target_elements(list[str] | None): lista di selettori CSS su cui restringere l'estrazione
         """
+
         self.crawler_config = CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
             excluded_tags=["nav", "header", "footer", "aside"],
@@ -50,15 +51,16 @@ class Parser(ABC):
             target_elements=target_elements or [],
         )
 
+
     async def _fetch(self, url: str, raw_html: str | None = None):
         """Acquisisce una pagina usando il crawler condiviso
 
-        se ``raw_html`` è fornito non viene effettuata nessuna richiesta di rete: 
-        crawl4ai processa direttamente l'HTML passato (prefisso ``raw:``)
+        se ``raw_html`` è fornito non viene effettuata nessuna richiesta di rete, 
+        crawl4ai processa direttamente l'HTML passato
 
         Args:
-            url: URL assoluto della pagina (usato per logging e messaggi d'errore)
-            raw_html: HTML già scaricato lato client
+            url(str): URL assoluto della pagina (usato per logging e messaggi d'errore)
+            raw_html(str): HTML già scaricato lato client
 
         Returns:
             un ``CrawlResult`` di crawl4ai con ``success=True``
@@ -66,6 +68,7 @@ class Parser(ABC):
         Raises:
             CrawlError: se il crawler ritorna ``success=False``
         """
+
         crawler = await get_crawler()
         fetch_target = f"raw:{raw_html}" if raw_html is not None else url
         result = await crawler.arun(url=fetch_target, config=self.crawler_config)
@@ -76,14 +79,15 @@ class Parser(ABC):
                 error_message=getattr(result, "error_message", None),
             )
         return result
+    
 
     @abstractmethod
     async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
         """Acquisisce la pagina e ne estrae il markdown pulito
 
         Args:
-            url: URL assoluto della pagina
-            raw_html: se fornito, l'HTML viene processato senza crawl di rete
+            url(str): URL assoluto della pagina
+            raw_html(str): se fornito, l'HTML viene processato senza crawl di rete
 
         Returns:
             un ``ParsedDocument`` con ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``
@@ -98,7 +102,7 @@ class Parser(ABC):
         """Applica pipeline di pulizia specifica rispetto al dominio
 
         Args:
-            text: testo MD grezzo estratto dalla pagina
+            text(str): testo MD grezzo estratto dalla pagina
 
         Returns:
             testo MD pulito

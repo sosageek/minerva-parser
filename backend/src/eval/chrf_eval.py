@@ -29,7 +29,7 @@ class ChrFEvaluator(Evaluator):
         (libreria sacrebleu ritorna il punteggio in scala 0-100)
 
         Args:
-            parsed_text(str): testo estratto dal parser (ipotesi)
+            parsed_text(str): testo estratto dal parser
             gold_text(str): testo di riferimento del gold standard
 
         Returns:
