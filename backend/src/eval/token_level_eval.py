@@ -16,6 +16,7 @@ class TokenLevelEvaluator(Evaluator):
 
     _WORD_RE = re.compile(r"\w+", re.UNICODE)
 
+
     def evaluate(self, parsed_text: str, gold_text: str) -> dict:
         """Precision, recall e f1 sull'overlap dei token con il gold
 
@@ -31,6 +32,7 @@ class TokenLevelEvaluator(Evaluator):
             dict con chiavi ``precision``, ``recall`` ed ``f1``
             se uno dei due testi è vuoto le metriche corrispondenti valgono zero
         """
+
         tokens_parsed = self._tokenize(parsed_text)
         tokens_gold = self._tokenize(gold_text)
         intersection = self._intersection(tokens_parsed, tokens_gold)
@@ -40,6 +42,7 @@ class TokenLevelEvaluator(Evaluator):
             "recall": self._recall(tokens_gold, intersection),
             "f1": self._f1(tokens_parsed, tokens_gold, intersection)
         }
+
 
     def noise_ratio(self, parsed_text: str, gold_text: str) -> float:
         """Complementare della precision, cioè quanta spazzatura non dal gold è finita nel parsed
@@ -55,6 +58,7 @@ class TokenLevelEvaluator(Evaluator):
             float tra 0 e 1, arrotondato
             se il parsed è vuoto ritorna zero (non c'è rumore da misurare)
         """
+
         tokens_parsed = self._tokenize(parsed_text)
         if not tokens_parsed:
             return 0.0
@@ -62,17 +66,22 @@ class TokenLevelEvaluator(Evaluator):
         intersection = self._intersection(tokens_parsed, tokens_gold)
         return round(1.0 - self._precision(tokens_parsed, intersection), 4)
 
+
     def _tokenize(self, text: str) -> set:
         return set(self._WORD_RE.findall(text.lower()))
+
 
     def _intersection(self, a: set, b: set) -> set:
         return a & b
 
+
     def _precision(self, tokens_parsed: set, intersection: set) -> float:
         return round(len(intersection) / len(tokens_parsed), 4) if tokens_parsed else 0.0
 
+
     def _recall(self, tokens_gold: set, intersection: set) -> float:
         return round(len(intersection) / len(tokens_gold), 4) if tokens_gold else 0.0
+
 
     def _f1(self, tokens_parsed: set, tokens_gold: set, intersection: set) -> float:
         p = self._precision(tokens_parsed, intersection)

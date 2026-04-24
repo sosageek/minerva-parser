@@ -1,3 +1,1 @@
 from .token_level_eval import TokenLevelEvaluator
-from .noise_ratio_eval import NoiseRatioEvaluator
-from .coverage_score_eval import CoverageScoreEvaluator

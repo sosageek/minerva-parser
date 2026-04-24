@@ -10,7 +10,7 @@ async def get_crawler() -> AsyncWebCrawler:
     """Ritorna istanza condivisa del crawler
 
     Returns:
-        ``AsyncWebCrawler`` avviato e pronto a ricevere ``arun()``
+        istanza di ``AsyncWebCrawler`` avviato e pronto a ricevere ``arun()``
     """
     global _crawler
     async with _lock:
