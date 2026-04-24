@@ -1,3 +1,3 @@
 from .token_level_eval import TokenLevelEvaluator
-from .noise_ratio_eval import NoiseRatioEvaluator
-from .coverage_score_eval import CoverageScoreEvaluator
+from .chrf_eval import ChrFEvaluator
+from .rouge_eval import RougeOneEvaluator  # , RougeLEvaluator

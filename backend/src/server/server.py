@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Query
 
 from ..config import configure_logging
 from ..eval.chrf_eval import ChrFEvaluator
+from ..eval.rouge_eval import RougeOneEvaluator
 from ..eval.token_level_eval import TokenLevelEvaluator
 from ..parsers._crawler import close_crawler
 from ..parsers.parser import CrawlError, Parser
@@ -29,6 +30,7 @@ logger = logging.getLogger("minerva-parser.api")
 _gs_store: dict[str, list[dict]] = {}
 _evaluator = TokenLevelEvaluator()
 _chrf = ChrFEvaluator()
+_rouge1 = RougeOneEvaluator()
 
 
 @asynccontextmanager
@@ -163,7 +165,7 @@ def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
     """Calcola le metriche di evaluation per una coppia (parsed, gold)
 
     * ``token_level_eval`` (obbligatorio): precision, recall, f1
-    * ``x_eval``: metriche accessorie — ``chrf`` e ``noise_ratio``
+    * ``x_eval``: metriche accessorie — ``chrf``, ``noise_ratio`` e ``rouge_1``
 
     Returns:
         ``ParseEvaluation`` con ``token_level_eval`` e ``x_eval``
@@ -174,6 +176,7 @@ def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
     x_eval = {
         "chrf": _chrf.evaluate(parsed_clean, gold_clean),
         "noise_ratio": _evaluator.noise_ratio(parsed_clean, gold_clean),
+        "rouge_1": _rouge1.evaluate(parsed_clean, gold_clean),
     }
     return ParseEvaluation(
         token_level_eval=TokenLevelEval(**token_metrics),
@@ -294,6 +297,9 @@ async def full_gs_eval(
     f1s: list[float] = []
     chrfs: list[float] = []
     noise_ratios: list[float] = []
+    rouge_1_ps: list[float] = []
+    rouge_1_rs: list[float] = []
+    rouge_1_f1s: list[float] = []
     failed: list[str] = []
 
     for entry in entries:
@@ -313,6 +319,10 @@ async def full_gs_eval(
         f1s.append(metrics["f1"])
         chrfs.append(_chrf.evaluate(parsed_clean, gold_clean))
         noise_ratios.append(_evaluator.noise_ratio(parsed_clean, gold_clean))
+        r1 = _rouge1.evaluate(parsed_clean, gold_clean)
+        rouge_1_ps.append(r1["precision"])
+        rouge_1_rs.append(r1["recall"])
+        rouge_1_f1s.append(r1["f1"])
 
     if not precisions:
         raise HTTPException(
@@ -331,6 +341,11 @@ async def full_gs_eval(
         "n_total": len(entries),
         "chrf": round(sum(chrfs) / n, 4),
         "noise_ratio": round(sum(noise_ratios) / n, 4),
+        "rouge_1": {
+            "precision": round(sum(rouge_1_ps) / n, 4),
+            "recall": round(sum(rouge_1_rs) / n, 4),
+            "f1": round(sum(rouge_1_f1s) / n, 4),
+        },
     }
     if failed:
         x_eval["failed_urls"] = failed
