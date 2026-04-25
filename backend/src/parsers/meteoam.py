@@ -1,5 +1,5 @@
 import re
-from crawl4ai import CrawlResult
+from crawl4ai import CacheMode, CrawlerRunConfig, CrawlResult
 from urllib.parse import urlparse, unquote
 from .parser import Parser
 from .schema import ParsedDocument
@@ -23,7 +23,12 @@ class MeteoAmParser(Parser):
         "section[data-wcs-title='Potrebbe piacerti anche'], "
         "section[data-wcs-title='Articoli recenti'], "
         "section[data-web-app='EditorImageGallery'], "
-        "section[data-web-app='ArticleHeader']"
+        "section[data-web-app='ArticleHeader'], "
+        # banner cookie iubenda: sugli articoli del GS sta già fuori da
+        # section#details_news_page, qui serve solo per la fallback path
+        "#iubenda-cs-banner, "
+        ".iubenda-cs-container, "
+        "[id^='iubenda-cs']"
     )
     _TARGET_ELEMENTS = ["section#details_news_page"]
 
@@ -68,6 +73,13 @@ class MeteoAmParser(Parser):
 
         result = await self._fetch(url, raw_html=raw_html)
 
+        # gli articoli vivono dentro section#details_news_page e il primo fetch li copre tutti
+        # le pagine non-articolo (regioni, schede prodotto, sezioni tematiche) non hanno quel
+        # selettore: target_elements filtra tutto e il markdown esce vuoto. in quel caso
+        # rifacciamo il giro senza target restrittivi, tenendo solo gli excluded selectors
+        if not (result.markdown or "").strip():
+            result = await self._fetch(url, raw_html=raw_html, config=self._fallback_config())
+
         return ParsedDocument(
             url=url,
             domain=urlparse(url).netloc,
@@ -97,6 +109,24 @@ class MeteoAmParser(Parser):
         return text.strip()
     
 # ---------------------------------- HELPER PRIVATI ----------------------------------
+
+    def _fallback_config(self) -> CrawlerRunConfig:
+        """Config alternativa per pagine meteoam.it senza ``section#details_news_page``
+
+        nota: stessi excluded selectors e stessi excluded tags della config principale,
+        ma ``target_elements`` vuoto così crawl4ai estrae tutto il body al netto di nav/aside
+
+        Returns:
+            ``CrawlerRunConfig`` da usare come secondo tentativo se il primo torna vuoto
+        """
+
+        return CrawlerRunConfig(
+            cache_mode=CacheMode.BYPASS,
+            excluded_tags=["nav", "header", "footer", "aside"],
+            word_count_threshold=10,
+            remove_forms=True,
+            excluded_selector=self._EXCLUDED_SELECTORS,
+        )
 
     def _extract_title(self, result: CrawlResult, url: str) -> str:
         """Estrae il titolo della pagina

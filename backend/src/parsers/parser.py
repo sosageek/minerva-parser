@@ -54,15 +54,16 @@ class Parser(ABC):
         )
 
 
-    async def _fetch(self, url: str, raw_html: str | None = None):
+    async def _fetch(self, url: str, raw_html: str | None = None, config: CrawlerRunConfig | None = None):
         """Acquisisce una pagina usando il crawler condiviso
 
-        se ``raw_html`` è fornito non viene effettuata nessuna richiesta di rete, 
+        se ``raw_html`` è fornito non viene effettuata nessuna richiesta di rete,
         crawl4ai processa direttamente l'HTML passato
 
         Args:
             url(str): URL assoluto della pagina (usato per logging e messaggi d'errore)
             raw_html(str): HTML già scaricato lato client
+            config(CrawlerRunConfig): override della config; se None usa ``self.crawler_config``
 
         Returns:
             un ``CrawlResult`` di crawl4ai con ``success=True``
@@ -73,7 +74,7 @@ class Parser(ABC):
 
         crawler = await get_crawler()
         fetch_target = f"raw:{raw_html}" if raw_html is not None else url
-        result = await crawler.arun(url=fetch_target, config=self.crawler_config)
+        result = await crawler.arun(url=fetch_target, config=config or self.crawler_config)
         if not result.success:
             raise CrawlError(
                 url=url,

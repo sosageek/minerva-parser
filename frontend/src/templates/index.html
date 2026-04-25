@@ -4,11 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minerva Parser</title>
-  <link rel="icon" type="image/webp" href="/static/minerva.webp">
+  <link rel="icon" type="image/webp" href="/static/minerva.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&display=swap&subset=latin,latin-ext" rel="stylesheet">
   <style>
-    /* palette a 3 colori: maroon minerva, bianco, grigio neutro */
+    /* palette a 3 colori: maroon minerva, bianco, grigio neutro
+       griglia bento aggressiva, bordi quadri, sfalso a scaletta
+       tutte le spaziature sono multipli di 8px */
     :root {
       --maroon: #862633;
+      --maroon-dark: #6b1e29;
       --maroon-soft: #f4e5e8;
       --white: #ffffff;
       --gray-50: #f6f6f7;
@@ -17,489 +23,740 @@
       --gray-400: #8a8a92;
       --gray-600: #55555c;
       --gray-900: #1a1a1e;
-      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+
+      --radius: 4px;
+      --border-w: 2px;
+      --shadow-rest: 0 2px 0 rgba(26, 26, 30, .04);
+      --shadow-hover: 0 8px 0 var(--maroon-dark);
+      --ease: cubic-bezier(.22, .61, .36, 1);
     }
 
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+      font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       background: var(--gray-50);
       color: var(--gray-900);
       line-height: 1.5;
-      font-size: 15px;
+      font-size: 14px;
+      min-height: 100vh;
     }
-    a { color: var(--maroon); }
+    a { color: var(--maroon); text-decoration: none; }
+    a:hover { text-decoration: underline; }
 
-    .container { max-width: 1120px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    .wrap {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
 
-    header.hero {
-      margin-bottom: 1.5rem;
+    /* ===== bento grid aggressiva =====
+       12 col, gap 16px. lo sfalso è dato da `margin-top` su cell selezionate:
+       un offset di 24/40px sulle card secondarie crea la scaletta verticale
+       senza rompere l'allineamento di base */
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-auto-rows: minmax(80px, auto);
+      gap: 16px;
+    }
+
+    .cell {
+      background: var(--white);
+      border: var(--border-w) solid var(--gray-900);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow-rest);
+      transition:
+        transform .25s var(--ease),
+        box-shadow .25s var(--ease),
+        background .25s var(--ease);
       display: flex;
-      align-items: center;
-      gap: .9rem;
+      flex-direction: column;
+      min-width: 0;
     }
-    header.hero img.logo {
-      width: 48px;
-      height: 48px;
-      border-radius: 8px;
-      background: var(--maroon);
+    .cell.is-hoverable:hover {
+      transform: translate(-4px, -4px);
+      box-shadow: 8px 8px 0 var(--gray-900);
     }
-    header.hero h1 {
-      font-size: 1.7rem;
-      margin: 0;
-      letter-spacing: -0.01em;
-    }
-    header.hero h1 .dot { color: var(--maroon); }
-
-    /* card generica */
-    .card {
-      background: var(--white);
-      border: 1px solid var(--gray-100);
-      border-radius: 10px;
-      box-shadow: var(--shadow);
-    }
-
-    /* search */
-    .search { padding: 1.1rem 1.1rem 1rem; margin-bottom: 1rem; }
-    .search form { display: flex; gap: .5rem; }
-    .search input[type=text] {
-      flex: 1;
-      padding: .6rem .8rem;
-      font-size: .95rem;
-      border: 1px solid var(--gray-200);
-      border-radius: 6px;
-      background: var(--white);
-      color: var(--gray-900);
-    }
-    .search input[type=text]:focus {
-      outline: 2px solid var(--maroon);
-      outline-offset: -1px;
-      border-color: var(--maroon);
-    }
-    .btn-primary {
-      padding: .6rem 1.3rem;
-      font-size: .95rem;
-      font-weight: 600;
+    .cell.is-accent {
       background: var(--maroon);
       color: var(--white);
-      border: 0;
-      border-radius: 6px;
-      cursor: pointer;
+      border-color: var(--gray-900);
     }
-    .btn-primary:hover { filter: brightness(1.08); }
+    .cell.is-accent.is-hoverable:hover {
+      box-shadow: 8px 8px 0 var(--maroon-dark);
+    }
+    .cell.is-accent .eyebrow,
+    .cell.is-accent .meta { color: rgba(255, 255, 255, .8); }
+    .cell.is-accent h1 { color: var(--white); }
+
+    /* slot bento — header, sfalsi a scaletta */
+    .cell--brand    { grid-column: span 5; grid-row: span 2; }
+    .cell--search   { grid-column: span 7; grid-row: span 2; margin-top: 24px; }
+
+    .cell--meta     { grid-column: span 12; }
+    .cell--html     { grid-column: span 12; margin-top: 8px; }
+
+    .cell--parsed   { grid-column: span 7; }
+    .cell--gold     { grid-column: span 5; margin-top: 24px; }
+    .cell--parsed.is-full { grid-column: span 12; }
+
+    .cell--m-token  { grid-column: span 4; }
+    .cell--m-rouge  { grid-column: span 4; margin-top: 16px; }
+    .cell--m-extra  { grid-column: span 4; margin-top: 32px; }
+
+    .cell--error    { grid-column: span 12; background: var(--maroon-soft); border-color: var(--maroon-dark); color: var(--maroon-dark); }
+
+    @media (max-width: 960px) {
+      .cell--brand, .cell--search, .cell--parsed, .cell--gold,
+      .cell--m-token, .cell--m-rouge, .cell--m-extra {
+        grid-column: span 12;
+        grid-row: span 1;
+        margin-top: 0;
+      }
+    }
+
+    /* ===== brand ===== */
+    .brand-top { display: flex; align-items: center; gap: 24px; }
+    .brand-logo {
+      width: 128px;
+      height: 128px;
+      object-fit: contain;
+      background: var(--white);
+      padding: 8px;
+      border: var(--border-w) solid var(--gray-900);
+      border-radius: var(--radius);
+      flex-shrink: 0;
+    }
+    .cell--brand { justify-content: center; }
+    .cell--brand h1 {
+      font-family: "Geist Mono", monospace;
+      font-size: 2rem;
+      margin: 0;
+      letter-spacing: -0.02em;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .cell--brand h1 .dot { color: rgba(255, 255, 255, .6); }
+    .eyebrow {
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: .16em;
+      color: var(--gray-400);
+      font-weight: 600;
+      margin: 0 0 8px;
+    }
+
+    /* ===== search ===== */
+    .search-row { display: flex; gap: 8px; }
+    .search-row input[type=text] {
+      flex: 1;
+      padding: 16px;
+      font-family: inherit;
+      font-size: .85rem;
+      border: var(--border-w) solid var(--gray-900);
+      border-radius: var(--radius);
+      background: var(--white);
+      color: var(--gray-900);
+      transition: box-shadow .2s var(--ease);
+      min-width: 0;
+    }
+    .search-row input[type=text]:focus {
+      outline: none;
+      box-shadow: 4px 4px 0 var(--maroon);
+    }
+    .btn {
+      font-family: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: var(--radius);
+      transition:
+        transform .18s var(--ease),
+        box-shadow .18s var(--ease),
+        background .18s var(--ease),
+        color .18s var(--ease);
+    }
+    .btn:active { transform: translate(2px, 2px); box-shadow: none !important; }
+    .btn-primary {
+      padding: 16px 32px;
+      font-size: .85rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      background: var(--maroon);
+      color: var(--white);
+      border: var(--border-w) solid var(--gray-900);
+    }
+    .btn-primary:hover {
+      background: var(--maroon-dark);
+      transform: translate(-2px, -2px);
+      box-shadow: 4px 4px 0 var(--gray-900);
+    }
     .btn-outline {
-      padding: .45rem 1rem;
-      font-size: .88rem;
+      padding: 8px 16px;
+      font-size: .75rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
       background: var(--white);
       color: var(--maroon);
-      border: 1px solid var(--maroon);
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 500;
+      border: var(--border-w) solid var(--maroon);
+    }
+    .btn-outline:hover:not(:disabled) {
+      background: var(--maroon);
+      color: var(--white);
+      transform: translate(-2px, -2px);
+      box-shadow: 4px 4px 0 var(--maroon-dark);
     }
     .btn-outline:disabled {
       color: var(--gray-400);
       border-color: var(--gray-200);
       cursor: not-allowed;
     }
-    .btn-outline:not(:disabled):hover { background: var(--maroon-soft); }
 
     .gs-row {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: .5rem;
-      margin-top: .9rem;
-      padding-top: .9rem;
-      border-top: 1px dashed var(--gray-100);
+      gap: 8px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 2px dashed var(--gray-200);
     }
-    .gs-row .label-inline { color: var(--gray-600); font-size: .88rem; margin-right: .25rem; }
+    .gs-row .label-inline {
+      color: var(--gray-600);
+      font-size: .75rem;
+      letter-spacing: .04em;
+      margin-right: 8px;
+      text-transform: uppercase;
+    }
     .gs-row .spacer { flex: 1; }
+    .gs-row select,
+    .gs-row select option {
+      /* nota: Windows tende a renderizzare le option con il font di sistema
+         a prescindere; mettiamo uno stack ricco così se Geist Mono non viene
+         applicato i caratteri estesi (ñ, ó, à, ...) escono comunque */
+      font-family: "Geist Mono", "Segoe UI", -apple-system, BlinkMacSystemFont, Inter, ui-monospace, monospace;
+    }
     .gs-row select {
-      padding: .45rem .6rem;
-      font-size: .88rem;
-      border: 1px solid var(--gray-200);
-      border-radius: 6px;
+      padding: 8px 16px;
+      font-size: .8rem;
+      border: var(--border-w) solid var(--gray-900);
+      border-radius: var(--radius);
       background: var(--white);
       color: var(--gray-900);
       max-width: 100%;
+      cursor: pointer;
+      transition: box-shadow .2s var(--ease);
     }
-    .gs-row select:disabled { background: var(--gray-50); color: var(--gray-400); }
-
-    /* error banner */
-    .error {
-      margin: 1rem 0;
-      padding: .75rem 1rem;
-      background: var(--maroon-soft);
-      border: 1px solid #e5c4ca;
-      color: var(--maroon);
-      border-radius: 8px;
-      font-size: .92rem;
+    .gs-row select:hover:not(:disabled) { box-shadow: 2px 2px 0 var(--maroon); }
+    .gs-row select:disabled {
+      background: var(--gray-50);
+      color: var(--gray-400);
+      cursor: not-allowed;
+      border-color: var(--gray-200);
     }
 
-    /* meta header del risultato */
-    .result-head {
-      margin: 1.5rem 0 .75rem;
-      display: flex;
-      align-items: baseline;
-      flex-wrap: wrap;
-      gap: .6rem;
+    /* ===== meta ===== */
+    .meta-grid {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 16px 24px;
+      align-items: center;
     }
-    .result-head h2 { margin: 0; font-size: 1.15rem; }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; }
     .badge {
       display: inline-block;
-      padding: .12rem .55rem;
-      background: var(--maroon-soft);
-      color: var(--maroon);
-      border-radius: 999px;
-      font-size: .78rem;
+      padding: 8px 16px;
+      background: var(--maroon);
+      color: var(--white);
+      border: var(--border-w) solid var(--gray-900);
+      border-radius: var(--radius);
+      font-size: .68rem;
       font-weight: 600;
-      letter-spacing: .02em;
+      letter-spacing: .08em;
+      text-transform: uppercase;
     }
     .badge.neutral {
-      background: var(--gray-100);
-      color: var(--gray-600);
-    }
-    .meta-line { margin: .25rem 0; color: var(--gray-600); font-size: .88rem; word-break: break-all; }
-    .meta-line strong { color: var(--gray-900); font-weight: 600; margin-right: .3rem; }
-
-    /* collapsible html */
-    details.html-box { margin: 1rem 0; }
-    details.html-box > summary {
-      list-style: none;
-      cursor: pointer;
-      padding: .6rem .85rem;
       background: var(--white);
-      border: 1px solid var(--gray-100);
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: .9rem;
       color: var(--gray-900);
+    }
+    .meta {
+      font-size: .8rem;
+      color: var(--gray-600);
+      word-break: break-all;
+      min-width: 0;
+    }
+    .meta strong {
+      color: var(--gray-900);
+      font-weight: 700;
+      margin-right: 8px;
+      text-transform: uppercase;
+      font-size: .7rem;
+      letter-spacing: .08em;
+    }
+    .meta-stack { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+    /* ===== html collapsible ===== */
+    .html-toggle {
       display: flex;
       align-items: center;
-      gap: .5rem;
-    }
-    details.html-box > summary::-webkit-details-marker { display: none; }
-    details.html-box > summary::before {
-      content: "▸";
-      color: var(--gray-400);
-      font-size: .75rem;
-      transition: transform .15s;
-    }
-    details.html-box[open] > summary::before { transform: rotate(90deg); }
-    details.html-box > summary .hint {
-      color: var(--gray-400);
-      font-weight: 400;
-      font-size: .78rem;
-      margin-left: auto;
-    }
-    details.html-box[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 0; }
-    details.html-box .html-pre {
-      margin: 0;
-      border: 1px solid var(--gray-100);
-      border-top: 0;
-      border-radius: 0 0 8px 8px;
-      padding: .75rem;
-      max-height: 260px;
-      overflow: auto;
-      background: var(--gray-50);
-      font-size: .78rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      white-space: pre-wrap;
-      word-break: break-word;
-      color: var(--gray-600);
-    }
-
-    /* griglia testi */
-    .texts {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: .75rem;
-    }
-    .texts.single { grid-template-columns: 1fr; }
-    .text-card {
-      background: var(--white);
-      border: 1px solid var(--gray-100);
-      border-radius: 8px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-    .text-card .head {
-      padding: .55rem .85rem;
-      background: var(--gray-50);
-      border-bottom: 1px solid var(--gray-100);
-      font-size: .82rem;
+      gap: 8px;
+      cursor: pointer;
+      list-style: none;
       font-weight: 600;
-      letter-spacing: .02em;
+      font-size: .82rem;
       color: var(--gray-900);
       text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: .5rem;
+      letter-spacing: .04em;
     }
-    .text-card .head .kind {
-      margin-left: auto;
+    .html-toggle::-webkit-details-marker { display: none; }
+    .html-toggle::before {
+      content: "▸";
+      color: var(--maroon);
+      font-size: .75rem;
+      transition: transform .2s var(--ease);
+    }
+    details[open] > .html-toggle::before { transform: rotate(90deg); }
+    .html-toggle .hint {
       color: var(--gray-400);
-      font-weight: 500;
+      font-weight: 400;
       font-size: .72rem;
+      margin-left: auto;
       text-transform: none;
       letter-spacing: 0;
     }
-    .text-card .body {
-      padding: .85rem 1rem;
-      max-height: 420px;
+    .html-pre {
+      margin: 16px 0 0;
+      border: var(--border-w) solid var(--gray-900);
+      border-radius: var(--radius);
+      padding: 16px;
+      max-height: 320px;
+      overflow: auto;
+      background: var(--gray-50);
+      font-size: .72rem;
+      font-family: inherit;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--gray-600);
+    }
+
+    /* ===== text card body ===== */
+    .text-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 16px;
+      border-bottom: var(--border-w) solid var(--gray-900);
+      margin-bottom: 16px;
+    }
+    .text-head h3 {
+      margin: 0;
+      font-size: .82rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--gray-900);
+    }
+    .text-head .kind {
+      margin-left: auto;
+      color: var(--gray-400);
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    .text-body {
+      max-height: 480px;
       overflow-y: auto;
       overflow-x: hidden;
-      font-size: .92rem;
-      line-height: 1.55;
+      font-size: .85rem;
+      line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-word;
       color: var(--gray-900);
     }
 
-    /* metriche */
-    .metrics { margin-top: 1.5rem; }
-    .metrics h3 {
-      margin: 0 0 .75rem;
-      font-size: 1.05rem;
-    }
-
-    .metric-group { margin-bottom: 1.25rem; }
-    .metric-group h4 {
-      margin: 0 0 .5rem;
-      font-size: .78rem;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: var(--gray-600);
-    }
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: .6rem;
-    }
-    .metric-grid.wide { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-    .metric {
-      background: var(--white);
-      border: 1px solid var(--gray-100);
-      border-radius: 8px;
-      padding: .75rem .9rem;
-    }
-    .metric .name {
-      font-size: .78rem;
-      color: var(--gray-600);
-      letter-spacing: .02em;
+    /* ===== metric cards: donut circolari ===== */
+    .m-head {
       display: flex;
       align-items: baseline;
-      gap: .3rem;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: var(--border-w) solid var(--gray-900);
     }
-    .metric .name .sub { color: var(--gray-400); font-size: .7rem; }
-    .metric .value {
-      font-size: 1.45rem;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      margin-top: .1rem;
+    .m-head h3 {
+      margin: 0;
+      font-size: .82rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
       color: var(--gray-900);
     }
-    .metric .bar {
-      height: 4px;
-      margin-top: .55rem;
-      background: var(--gray-100);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .metric .bar > span {
-      display: block;
-      height: 100%;
-      background: var(--maroon);
-      border-radius: 2px;
-    }
-
-    footer.foot {
-      margin-top: 2.5rem;
+    .m-head .m-tag {
+      font-size: .65rem;
       color: var(--gray-400);
-      font-size: .78rem;
-      text-align: center;
+      letter-spacing: .12em;
+      text-transform: uppercase;
     }
-    footer.foot .names { color: var(--gray-600); font-weight: 500; }
 
-    @media (max-width: 720px) {
-      .texts { grid-template-columns: 1fr; }
-      .metric-grid { grid-template-columns: 1fr 1fr; }
-      .search form { flex-direction: column; }
-      .btn-primary { width: 100%; }
+    .donut-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      justify-items: center;
     }
+    .donut-row.solo { grid-template-columns: 1fr; }
+
+    /* il donut: SVG con circle stroke-dashoffset.
+       il riempimento è scalato sul valore [0,1] della metrica */
+    .donut {
+      position: relative;
+      width: 96px;
+      height: 96px;
+      flex-shrink: 0;
+    }
+    .donut svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    .donut .track {
+      fill: none;
+      stroke: var(--gray-100);
+      stroke-width: 10;
+    }
+    .donut .arc {
+      fill: none;
+      stroke: var(--maroon);
+      stroke-width: 10;
+      stroke-linecap: butt;
+      transition: stroke-dashoffset .6s var(--ease);
+    }
+    .donut .center {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+    .donut .val {
+      font-size: 1.05rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--gray-900);
+      letter-spacing: -.02em;
+    }
+    .donut .lbl {
+      font-size: .58rem;
+      color: var(--gray-600);
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
+
+    .m-extra {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      justify-items: center;
+      align-items: start;
+    }
+    /* sub-label dentro il donut: testo piccolo sotto la label principale,
+       senza sovrapporsi al bordo del cerchio. la usiamo in altre-metriche dove
+       i due donut sono più grandi (120px) e c'è spazio interno sufficiente */
+    .donut .lbl-sub {
+      font-size: .54rem;
+      color: var(--gray-400);
+      text-transform: none;
+      letter-spacing: .01em;
+      margin-top: 2px;
+      max-width: 92px;
+      text-align: center;
+      line-height: 1.15;
+    }
+    .m-extra .donut {
+      width: 144px;
+      height: 144px;
+    }
+    .m-extra .donut .val { font-size: 1.25rem; }
+    .m-extra .donut .lbl { font-size: .66rem; }
+    .m-extra .donut .lbl-sub { font-size: .58rem; max-width: 104px; }
+
+    /* ===== footer ===== */
+    footer.foot {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: var(--border-w) solid var(--gray-900);
+      color: var(--gray-600);
+      font-size: .72rem;
+      text-align: center;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+    footer.foot .names { color: var(--gray-900); font-weight: 700; }
   </style>
 </head>
 <body>
-  <div class="container">
+  <div class="wrap">
 
-    <header class="hero">
-      <img src="/static/minerva.webp" alt="Minerva NLP" class="logo">
-      <h1>Minerva Parser<span class="dot">.</span></h1>
-    </header>
+    <div class="bento">
 
-    <section class="card search">
-      <form method="get" action="/">
-        <input type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
-        <button class="btn-primary" type="submit">Parse</button>
-      </form>
-
-      {% if domains %}
-      <div class="gs-row">
-        <span class="label-inline">oppure dal gold standard:</span>
-        <select id="gs-domain">
-          <option value="">— dominio —</option>
-          {% for d in domains %}
-          <option value="{{ d }}">{{ d }}</option>
-          {% endfor %}
-        </select>
-        <select id="gs-url" disabled>
-          <option value="">— url —</option>
-        </select>
-        <span class="spacer"></span>
-        <button class="btn-outline" type="button" id="gs-go" disabled>Parse dal GS</button>
-      </div>
-      <script>
-        const fullGs = {{ full_gs | tojson }};
-        const selDomain = document.getElementById("gs-domain");
-        const selUrl = document.getElementById("gs-url");
-        const btnGo = document.getElementById("gs-go");
-
-        selDomain.addEventListener("change", () => {
-          selUrl.innerHTML = '<option value="">— url —</option>';
-          const entries = fullGs[selDomain.value] || [];
-          for (const e of entries) {
-            const opt = document.createElement("option");
-            opt.value = e.url;
-            opt.textContent = e.title || e.url;
-            selUrl.appendChild(opt);
-          }
-          selUrl.disabled = entries.length === 0;
-          btnGo.disabled = true;
-        });
-        selUrl.addEventListener("change", () => { btnGo.disabled = !selUrl.value; });
-        btnGo.addEventListener("click", () => {
-          if (selUrl.value) window.location.href = "/?url=" + encodeURIComponent(selUrl.value);
-        });
-      </script>
-      {% else %}
-      <div class="gs-row">
-        <span class="label-inline">backend non raggiungibile: nessun dominio disponibile.</span>
-      </div>
-      {% endif %}
-    </section>
-
-    {% if error %}
-    <div class="error">{{ error }}</div>
-    {% endif %}
-
-    {% if parse_result %}
-    <div class="result-head">
-      <h2>Risultato</h2>
-      <span class="badge">{{ parse_result.domain }}</span>
-      {% if gs_entry %}<span class="badge neutral">nel gold standard</span>{% endif %}
-    </div>
-    <p class="meta-line"><strong>URL</strong>{{ parse_result.url }}</p>
-    <p class="meta-line"><strong>Titolo</strong>{{ parse_result.title }}</p>
-
-    <details class="html-box">
-      <summary>html text <span class="hint">clicca per espandere</span></summary>
-      <pre class="html-pre">{{ parse_result.html_text }}</pre>
-    </details>
-
-    {% if gs_entry %}
-    <div class="texts">
-      <div class="text-card">
-        <div class="head">parsed text <span class="kind">markdown</span></div>
-        <div class="body">{{ parse_result.parsed_text }}</div>
-      </div>
-      <div class="text-card">
-        <div class="head">gold text <span class="kind">plain</span></div>
-        <div class="body">{{ gs_entry.gold_text }}</div>
-      </div>
-    </div>
-    {% else %}
-    <div class="texts single">
-      <div class="text-card">
-        <div class="head">parsed text <span class="kind">markdown</span></div>
-        <div class="body">{{ parse_result.parsed_text }}</div>
-      </div>
-    </div>
-    <p class="meta-line" style="margin-top:.75rem;">URL non nel gold standard: evaluation non disponibile.</p>
-    {% endif %}
-
-    {% if evaluation %}
-    <section class="metrics">
-      <h3>Evaluation</h3>
-
-      <div class="metric-group">
-        <h4>token-level</h4>
-        <div class="metric-grid">
-          <div class="metric">
-            <div class="name">precision</div>
-            <div class="value">{{ "%.4f"|format(evaluation.token_level_eval.precision) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.token_level_eval.precision * 100)|round(1) }}%"></span></div>
-          </div>
-          <div class="metric">
-            <div class="name">recall</div>
-            <div class="value">{{ "%.4f"|format(evaluation.token_level_eval.recall) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.token_level_eval.recall * 100)|round(1) }}%"></span></div>
-          </div>
-          <div class="metric">
-            <div class="name">f1</div>
-            <div class="value">{{ "%.4f"|format(evaluation.token_level_eval.f1) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.token_level_eval.f1 * 100)|round(1) }}%"></span></div>
+      <!-- BRAND -->
+      <section class="cell cell--brand is-hoverable is-accent">
+        <div class="brand-top">
+          <img src="/static/minerva.png" alt="Minerva NLP" class="brand-logo">
+          <div>
+            <p class="eyebrow" style="color: rgba(255,255,255,.7); line-height: 1.4;">Laboratorio<br>ingegneria informatica<br>2026</p>
+            <h1>Minerva Parser<span class="dot">.</span></h1>
           </div>
         </div>
-      </div>
+      </section>
+
+      <!-- SEARCH -->
+      <section class="cell cell--search is-hoverable">
+        <p class="eyebrow">Input</p>
+        <form class="search-row" method="get" action="/">
+          <input type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
+          <button class="btn btn-primary" type="submit">Parse</button>
+        </form>
+
+        {% if domains %}
+        <div class="gs-row">
+          <span class="label-inline">oppure dal gold standard</span>
+          <select id="gs-domain">
+            <option value="">— dominio —</option>
+            {% for d in domains %}
+            <option value="{{ d }}">{{ d }}</option>
+            {% endfor %}
+          </select>
+          <select id="gs-url" disabled>
+            <option value="">— url —</option>
+          </select>
+          <span class="spacer"></span>
+          <button class="btn btn-outline" type="button" id="gs-go" disabled>Parse dal GS</button>
+        </div>
+        <script>
+          const fullGs = {{ full_gs | tojson }};
+          const selDomain = document.getElementById("gs-domain");
+          const selUrl = document.getElementById("gs-url");
+          const btnGo = document.getElementById("gs-go");
+
+          selDomain.addEventListener("change", () => {
+            selUrl.innerHTML = '<option value="">— url —</option>';
+            const entries = fullGs[selDomain.value] || [];
+            for (const e of entries) {
+              const opt = document.createElement("option");
+              opt.value = e.url;
+              opt.textContent = e.title || e.url;
+              selUrl.appendChild(opt);
+            }
+            selUrl.disabled = entries.length === 0;
+            btnGo.disabled = true;
+          });
+          selUrl.addEventListener("change", () => { btnGo.disabled = !selUrl.value; });
+          btnGo.addEventListener("click", () => {
+            if (selUrl.value) window.location.href = "/?url=" + encodeURIComponent(selUrl.value);
+          });
+        </script>
+        {% else %}
+        <div class="gs-row">
+          <span class="label-inline">backend non raggiungibile: nessun dominio disponibile.</span>
+        </div>
+        {% endif %}
+      </section>
+
+      {% if error %}
+      <section class="cell cell--error">
+        <strong>Errore:</strong> {{ error }}
+      </section>
+      {% endif %}
+
+      {% if parse_result %}
+      <!-- META -->
+      <section class="cell cell--meta is-hoverable">
+        <div class="meta-grid">
+          <div class="badges">
+            <span class="badge">{{ parse_result.domain }}</span>
+            {% if gs_entry %}<span class="badge neutral">nel gold standard</span>{% endif %}
+          </div>
+          <div class="meta-stack">
+            <div class="meta"><strong>URL</strong>{{ parse_result.url }}</div>
+            <div class="meta"><strong>Titolo</strong>{{ parse_result.title }}</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HTML COLLAPSIBLE -->
+      <section class="cell cell--html is-hoverable">
+        <details>
+          <summary class="html-toggle">html text <span class="hint">clicca per espandere</span></summary>
+          <pre class="html-pre">{{ parse_result.html_text }}</pre>
+        </details>
+      </section>
+
+      <!-- PARSED + GOLD -->
+      <section class="cell cell--parsed is-hoverable {% if not gs_entry %}is-full{% endif %}">
+        <div class="text-head">
+          <h3>parsed text</h3>
+          <span class="kind">markdown</span>
+        </div>
+        <div class="text-body">{{ parse_result.parsed_text }}</div>
+      </section>
+
+      {% if gs_entry %}
+      <section class="cell cell--gold is-hoverable">
+        <div class="text-head">
+          <h3>gold text</h3>
+          <span class="kind">plain</span>
+        </div>
+        <div class="text-body">{{ gs_entry.gold_text }}</div>
+      </section>
+      {% endif %}
+
+      {% if evaluation %}
+      <!-- METRICHE: donut circolari, valori decimali -->
+      <section class="cell cell--m-token is-hoverable">
+        <div class="m-head">
+          <h3>token-level</h3>
+          <span class="m-tag">P · R · F1</span>
+        </div>
+        <div class="donut-row">
+          {% set p = evaluation.token_level_eval.precision %}
+          {% set r = evaluation.token_level_eval.recall %}
+          {% set f = evaluation.token_level_eval.f1 %}
+          <div class="donut">
+            <svg viewBox="0 0 100 100">
+              <circle class="track" cx="50" cy="50" r="42"></circle>
+              <circle class="arc" cx="50" cy="50" r="42"
+                stroke-dasharray="263.89"
+                stroke-dashoffset="{{ (263.89 * (1 - p))|round(2) }}"></circle>
+            </svg>
+            <div class="center">
+              <span class="val">{{ "%.3f"|format(p) }}</span>
+              <span class="lbl">precision</span>
+            </div>
+          </div>
+          <div class="donut">
+            <svg viewBox="0 0 100 100">
+              <circle class="track" cx="50" cy="50" r="42"></circle>
+              <circle class="arc" cx="50" cy="50" r="42"
+                stroke-dasharray="263.89"
+                stroke-dashoffset="{{ (263.89 * (1 - r))|round(2) }}"></circle>
+            </svg>
+            <div class="center">
+              <span class="val">{{ "%.3f"|format(r) }}</span>
+              <span class="lbl">recall</span>
+            </div>
+          </div>
+          <div class="donut">
+            <svg viewBox="0 0 100 100">
+              <circle class="track" cx="50" cy="50" r="42"></circle>
+              <circle class="arc" cx="50" cy="50" r="42"
+                stroke-dasharray="263.89"
+                stroke-dashoffset="{{ (263.89 * (1 - f))|round(2) }}"></circle>
+            </svg>
+            <div class="center">
+              <span class="val">{{ "%.3f"|format(f) }}</span>
+              <span class="lbl">f1</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {% if evaluation.x_eval.rouge_1 %}
-      <div class="metric-group">
-        <h4>rouge-1</h4>
-        <div class="metric-grid">
-          <div class="metric">
-            <div class="name">precision</div>
-            <div class="value">{{ "%.4f"|format(evaluation.x_eval.rouge_1.precision) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.x_eval.rouge_1.precision * 100)|round(1) }}%"></span></div>
+      <section class="cell cell--m-rouge is-hoverable">
+        <div class="m-head">
+          <h3>rouge-1</h3>
+          <span class="m-tag">P · R · F1</span>
+        </div>
+        <div class="donut-row">
+          {% set rp = evaluation.x_eval.rouge_1.precision %}
+          {% set rr = evaluation.x_eval.rouge_1.recall %}
+          {% set rf = evaluation.x_eval.rouge_1.f1 %}
+          <div class="donut">
+            <svg viewBox="0 0 100 100">
+              <circle class="track" cx="50" cy="50" r="42"></circle>
+              <circle class="arc" cx="50" cy="50" r="42"
+                stroke-dasharray="263.89"
+                stroke-dashoffset="{{ (263.89 * (1 - rp))|round(2) }}"></circle>
+            </svg>
+            <div class="center">
+              <span class="val">{{ "%.3f"|format(rp) }}</span>
+              <span class="lbl">precision</span>
+            </div>
           </div>
-          <div class="metric">
-            <div class="name">recall</div>
-            <div class="value">{{ "%.4f"|format(evaluation.x_eval.rouge_1.recall) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.x_eval.rouge_1.recall * 100)|round(1) }}%"></span></div>
+          <div class="donut">
+            <svg viewBox="0 0 100 100">
+              <circle class="track" cx="50" cy="50" r="42"></circle>
+              <circle class="arc" cx="50" cy="50" r="42"
+                stroke-dasharray="263.89"
+                stroke-dashoffset="{{ (263.89 * (1 - rr))|round(2) }}"></circle>
+            </svg>
+            <div class="center">
+              <span class="val">{{ "%.3f"|format(rr) }}</span>
+              <span class="lbl">recall</span>
+            </div>
           </div>
-          <div class="metric">
-            <div class="name">f1</div>
-            <div class="value">{{ "%.4f"|format(evaluation.x_eval.rouge_1.f1) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.x_eval.rouge_1.f1 * 100)|round(1) }}%"></span></div>
+          <div class="donut">
+            <svg viewBox="0 0 100 100">
+              <circle class="track" cx="50" cy="50" r="42"></circle>
+              <circle class="arc" cx="50" cy="50" r="42"
+                stroke-dasharray="263.89"
+                stroke-dashoffset="{{ (263.89 * (1 - rf))|round(2) }}"></circle>
+            </svg>
+            <div class="center">
+              <span class="val">{{ "%.3f"|format(rf) }}</span>
+              <span class="lbl">f1</span>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
       {% endif %}
 
-      <div class="metric-group">
-        <h4>altre metriche</h4>
-        <div class="metric-grid wide">
+      <section class="cell cell--m-extra is-hoverable">
+        <div class="m-head">
+          <h3>altre metriche</h3>
+        </div>
+        <div class="m-extra">
           {% if evaluation.x_eval.chrf is defined %}
-          <div class="metric">
-            <div class="name">chrF</div>
-            <div class="value">{{ "%.4f"|format(evaluation.x_eval.chrf) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.x_eval.chrf * 100)|round(1) }}%"></span></div>
+          {% set cv = evaluation.x_eval.chrf %}
+          <div class="donut">
+            <svg viewBox="0 0 100 100">
+              <circle class="track" cx="50" cy="50" r="42"></circle>
+              <circle class="arc" cx="50" cy="50" r="42"
+                stroke-dasharray="263.89"
+                stroke-dashoffset="{{ (263.89 * (1 - cv))|round(2) }}"></circle>
+            </svg>
+            <div class="center">
+              <span class="val">{{ "%.3f"|format(cv) }}</span>
+              <span class="lbl">chrF</span>
+              <span class="lbl-sub">(sovrapposizione caratteri)</span>
+            </div>
           </div>
           {% endif %}
           {% if evaluation.x_eval.noise_ratio is defined %}
-          <div class="metric">
-            <div class="name">noise ratio <span class="sub">1 − precision</span></div>
-            <div class="value">{{ "%.4f"|format(evaluation.x_eval.noise_ratio) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.x_eval.noise_ratio * 100)|round(1) }}%"></span></div>
+          {% set nv = evaluation.x_eval.noise_ratio %}
+          <div class="donut">
+            <svg viewBox="0 0 100 100">
+              <circle class="track" cx="50" cy="50" r="42"></circle>
+              <circle class="arc" cx="50" cy="50" r="42"
+                stroke-dasharray="263.89"
+                stroke-dashoffset="{{ (263.89 * (1 - nv))|round(2) }}"></circle>
+            </svg>
+            <div class="center">
+              <span class="val">{{ "%.3f"|format(nv) }}</span>
+              <span class="lbl">noise</span>
+              <span class="lbl-sub">(1 − precision)</span>
+            </div>
           </div>
           {% endif %}
         </div>
-      </div>
-    </section>
-    {% endif %}
-    {% endif %}
+      </section>
+      {% endif %}
+      {% endif %}
+
+    </div>
 
     <footer class="foot">
       <span class="names">Cillo · Lobello · Mazzocco</span>
