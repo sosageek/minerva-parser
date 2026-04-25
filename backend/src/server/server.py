@@ -4,14 +4,11 @@ from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Query
 
-from ..config import configure_logging
-from ..eval.chrf_eval import ChrFEvaluator
-from ..eval.rouge_eval import RougeOneEvaluator
-from ..eval.token_level_eval import TokenLevelEvaluator
+from ..eval import TokenLevelEvaluator, ChrFEvaluator, RougeOneEvaluator
+from ..parsers import CrawlError, Parser, ParsedDocument
 from ..parsers._crawler import close_crawler
-from ..parsers.parser import CrawlError, Parser
-from ..parsers.schema import ParsedDocument
 from ..utils import strip_formatting
+from ..config import configure_logging
 from .models import (
     EvaluationInput,
     GSEntry,
@@ -24,6 +21,7 @@ from .models import (
 )
 from .registry import PARSERS, get_parser, load_gold_standards, supported_domains
 
+# ---------------------------------- CONF  ----------------------------------
 
 logger = logging.getLogger("minerva-parser.api")
 
@@ -41,6 +39,7 @@ async def lifespan(app: FastAPI):
     * all'avvio carica in memoria tutti i GS (failfast se manca un file)
     * alla chiusura chiude il crawler condiviso evitando processi zombie
     """
+
     configure_logging()
     global _gs_store
     _gs_store = load_gold_standards()
@@ -56,11 +55,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Minerva Parser API",
-    #version=
+    #version=0.67.69.420
     description="REST API per parsing, gold standard ed evaluation",
     lifespan=lifespan,
 )
 
+# ---------------------------------- HELPER  ----------------------------------
 
 def _extract_domain(url: str) -> str:
     """Estrae netloc da un URL
@@ -74,6 +74,7 @@ def _extract_domain(url: str) -> str:
     Raises:
         HTTPException(400): se scheme o netloc sono vuoti
     """
+
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise HTTPException(status_code=400, detail="malformed URL")
@@ -92,6 +93,7 @@ def _require_parser(domain: str) -> Parser:
     Raises:
         HTTPException(400): dominio non in ``registry.PARSERS``
     """
+
     parser = get_parser(domain)
     if parser is None:
         raise HTTPException(
@@ -110,6 +112,7 @@ def _require_supported_domain(domain: str) -> None:
     Raises:
         HTTPException(400): dominio non in ``registry.PARSERS``
     """
+
     if domain not in PARSERS:
         raise HTTPException(
             status_code=400,
@@ -134,6 +137,7 @@ async def _do_parse(url: str, html_text: str | None = None) -> ParsedDocument:
         HTTPException(400): dominio non supportato o URL malformato
         HTTPException(502): crawl fallisce
     """
+
     domain = _extract_domain(url)
     parser = _require_parser(domain)
     try:
@@ -158,18 +162,20 @@ def _prepare_for_eval(text: str) -> str:
     Returns:
         plain text pronto per la tokenizzazione e l'evaluation
     """
+
     return strip_formatting(text)
 
 
 def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
     """Calcola le metriche di evaluation per una coppia (parsed, gold)
 
-    * ``token_level_eval`` (obbligatorio): precision, recall, f1
-    * ``x_eval``: metriche accessorie — ``chrf``, ``noise_ratio`` e ``rouge_1``
+    * ``token_level_eval``: precision, recall, f1 (set)
+    * ``x_eval``: `chrf``, ``noise_ratio`` e ``rouge_1``
 
     Returns:
         ``ParseEvaluation`` con ``token_level_eval`` e ``x_eval``
     """
+
     parsed_clean = _prepare_for_eval(parsed_text)
     gold_clean = _prepare_for_eval(gold_text)
     token_metrics = _evaluator.evaluate(parsed_clean, gold_clean)
@@ -182,6 +188,8 @@ def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
         token_level_eval=TokenLevelEval(**token_metrics),
         x_eval=x_eval,
     )
+
+# ---------------------------------- API  ----------------------------------
 
 
 @app.get("/parse", response_model=ParseOutput)
@@ -198,6 +206,7 @@ async def parse(url: str = Query(..., description="URL assoluto da parsare")) ->
         HTTPException(400): dominio non supportato o URL malformato
         HTTPException(502): URL irraggiungibile
     """
+
     doc = await _do_parse(url)
     return ParseOutput(**doc.model_dump())
 
@@ -218,6 +227,7 @@ async def parse_html(payload: ParseInput) -> ParseOutput:
         HTTPException(400): dominio non supportato o URL malformato
         HTTPException(422): body mancante o invalido (gestito da FastAPI)
     """
+
     doc = await _do_parse(payload.url, html_text=payload.html_text)
     return ParseOutput(**doc.model_dump())
 
@@ -236,6 +246,7 @@ def gold_standard(url: str = Query(..., description="URL presente nel gold stand
         HTTPException(400): dominio non supportato
         HTTPException(404): URL non presente nel GS
     """
+
     domain = _extract_domain(url)
     _require_supported_domain(domain)
 
@@ -254,6 +265,7 @@ def full_gold_standard(
     Raises:
         HTTPException(400): dominio non supportato
     """
+
     _require_supported_domain(domain)
     entries = [GSEntry(**e) for e in _gs_store.get(domain, [])]
     return ListGSEntry(gold_standard=entries)
@@ -265,6 +277,7 @@ def evaluate(payload: EvaluationInput) -> ParseEvaluation:
 
     nota: la sintassi md viene rimossa prima della tokenizzazione e dell'evaluation
     """
+
     return _do_evaluate(payload.parsed_text, payload.gold_text)
 
 
@@ -289,6 +302,7 @@ async def full_gs_eval(
         HTTPException(400): dominio non supportato
         HTTPException(502): se tutti gli URL del GS falliscono al crawl
     """
+
     _require_supported_domain(domain)
     entries = _gs_store.get(domain, [])
 

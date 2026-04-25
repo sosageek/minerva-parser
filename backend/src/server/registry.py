@@ -2,21 +2,21 @@ import json
 from pathlib import Path
 
 from ..config import GS_DATA_DIR
-from ..parsers import MeteoAmParser, NpsParser, WikipediaParser, BookerParser
-from ..parsers.parser import Parser
+from ..parsers import MeteoAmParser, NpsParser, WikipediaParser, BookerParser, Parser
+
 
 PARSERS: dict[str, Parser] = {
     "www.meteoam.it": MeteoAmParser(),
     "en.wikipedia.org": WikipediaParser(),
     "www.nps.gov": NpsParser(),
-    "www.thebookerprizes.com": BookerParser(),
+    "thebookerprizes.com": BookerParser(),
 }
 
 GS_FILES: dict[str, Path] = {
     "www.meteoam.it": GS_DATA_DIR / "www.meteoam.it_gs.json",
     "en.wikipedia.org": GS_DATA_DIR / "en.wikipedia.org_gs.json",
     "www.nps.gov": GS_DATA_DIR / "www.nps.gov_gs.json",
-    "www.thebookerprizes.com": GS_DATA_DIR / "www.thebookerprizes.com_gs.json"
+    "thebookerprizes.com": GS_DATA_DIR / "thebookerprizes.com_gs.json"
 }
 
 
