@@ -7,36 +7,44 @@ from ..utils.cleaning import remove_markup, normalize_whitespace
 
 
 class BookerParser(Parser):
+    """Parser per le pagine di thebookerprizes.com
+
+    * isola il contenuto editoriale di news, profili autori e schede libro nel ``main`` (e ``main-page-content`` quando il template lo usa)
+    * scarta i widget promozionali: teaser grid, carousel youtube/slice/media, asymmetric/vertical teaser, ...
+
+    gli excluded selectors vengono passati direttamente a crawl4ai (non via beautiful soup come per wikipedia) perché qui i nodi da rimuovere sono section block-level e non mangiano il tail text adiacente
+
+    in `normalize` include regole di pulizia per il rumore di formattazione che il md converter di crawl4ai lascia
+    """
 
 # ---------------------------------- SELETTORI ----------------------------------
 
     _TARGET_ELEMENTS = ["main", "main-page-content"]
 
     _EXCLUDED_SELECTORS = (
-        "nav, footer, header, aside, figcaption,"
+        "figcaption, "
         ".cookies-banner, .newsletter-signup-block, "
-        "#block-views-block-related-features-related-features-other,"
-        "#block-views-block-related-features-related-features-feature,"
-        ".share-icons, .social-share,"
-        ".section.youtube-carousel, .c-path, .breadcrumb, .hidden,"
-        ".relative.z-20.container.mb-4,"
-        ".relative.z-20.container.mb-3,"
-        ".col-span-full.relative.mt-12,"
-        ".paragraph--type--slice-teaser,"
-        ".paragraph--type--slice-media,"
-        ".paragraph--type--asymmetric-teaser,"
-        ".paragraph--type--vertical-teaser,"
-        ".paragraph--type--youtube-carousel,"
-        ".paragraph--type--slice-carousel,"
-        "[data-js-paragraph-type-slice-teaser], "
-        "[data-js-paragraph-type-asymmetric-teaser], "
-        "[data-js-paragraph-type-vertical-teaser], "
+        "#block-views-block-related-features-related-features-other, "
+        "#block-views-block-related-features-related-features-feature, "
+        ".share-icons, .social-share, "
+        ".c-path, .breadcrumb, .hidden, "
+        ".relative.z-20.container.mb-4, "
+        ".relative.z-20.container.mb-3, "
+        ".col-span-full.relative.mt-12, "
+        ".paragraph--type--slice-teaser, "
+        ".paragraph--type--slice-media, "
+        ".paragraph--type--asymmetric-teaser, "
+        ".paragraph--type--vertical-teaser, "
+        ".paragraph--type--youtube-carousel, "
+        ".paragraph--type--slice-carousel, "
         "[data-js-related-carousel], "
-        ".book_selling_form, .book-selling-retailers, .book-selling-formats, "
+        ".book_selling_form, "
         ".c-modal, .flickity-button, .sr-only, .c-media, .c-carousel"
     )
 
 # ------------------------------------ REGEX -------------------------------------
+
+    _RE_CONSECUTIVE_DUPS = re.compile(r'^(.+)(\n\1)+$', re.MULTILINE)
 
     def __init__(self):
         super().__init__(
@@ -67,7 +75,7 @@ class BookerParser(Parser):
         return ParsedDocument(
             url=final_url,
             domain=urlparse(url).netloc,
-            title=self._extract_titile(result, final_url),
+            title=self._extract_title(result, final_url),
             html_text=result.cleaned_html,
             parsed_text=self.normalize(result.markdown or ""),
         )
@@ -76,6 +84,8 @@ class BookerParser(Parser):
     def normalize(self, text: str) -> str:
         """Applica pipeline di pulizia specifica al testo markdown
         estratto da una pagina thebookerprizes.com con crawl4ai
+
+        include lo strip per riga (il template del cms indenta tutto), la rimozione del markup md residuo, il dedup di righe consecutive identiche (i widget ripetono headline + cta vicine) e la normalizzazione finale dello whitespace
 
         Args:
             text(str): testo markdown grezzo generato da crawl4ai
@@ -86,11 +96,11 @@ class BookerParser(Parser):
 
         text = "\n".join(line.strip() for line in text.split('\n'))
         text = remove_markup(text)
-        text = re.sub(r'^(.+)(\n\1)+$', r'\1', text, flags=re.MULTILINE)
+        text = self._RE_CONSECUTIVE_DUPS.sub(r'\1', text)
         return normalize_whitespace(text).strip()
 
 
-   def _extract_title(self, result: CrawlResult, url: str) -> str:
+    def _extract_title(self, result: CrawlResult, url: str) -> str:
         """Estrae il titolo della pagina
 
         * preferisce il contenuto del tag ``<title>`` html
