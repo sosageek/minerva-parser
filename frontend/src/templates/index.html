@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minerva Parser</title>
+  <link rel="icon" type="image/webp" href="/static/minerva.webp">
+  <style>
+    /* palette a 3 colori: maroon minerva, bianco, grigio neutro */
+    :root {
+      --maroon: #862633;
+      --maroon-soft: #f4e5e8;
+      --white: #ffffff;
+      --gray-50: #f6f6f7;
+      --gray-100: #ececee;
+      --gray-200: #d9d9dd;
+      --gray-400: #8a8a92;
+      --gray-600: #55555c;
+      --gray-900: #1a1a1e;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+      background: var(--gray-50);
+      color: var(--gray-900);
+      line-height: 1.5;
+      font-size: 15px;
+    }
+    a { color: var(--maroon); }
+
+    .container { max-width: 1120px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+
+    header.hero {
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: .9rem;
+    }
+    header.hero img.logo {
+      width: 48px;
+      height: 48px;
+      border-radius: 8px;
+      background: var(--maroon);
+    }
+    header.hero h1 {
+      font-size: 1.7rem;
+      margin: 0;
+      letter-spacing: -0.01em;
+    }
+    header.hero h1 .dot { color: var(--maroon); }
+
+    /* card generica */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--gray-100);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+    }
+
+    /* search */
+    .search { padding: 1.1rem 1.1rem 1rem; margin-bottom: 1rem; }
+    .search form { display: flex; gap: .5rem; }
+    .search input[type=text] {
+      flex: 1;
+      padding: .6rem .8rem;
+      font-size: .95rem;
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      background: var(--white);
+      color: var(--gray-900);
+    }
+    .search input[type=text]:focus {
+      outline: 2px solid var(--maroon);
+      outline-offset: -1px;
+      border-color: var(--maroon);
+    }
+    .btn-primary {
+      padding: .6rem 1.3rem;
+      font-size: .95rem;
+      font-weight: 600;
+      background: var(--maroon);
+      color: var(--white);
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-outline {
+      padding: .45rem 1rem;
+      font-size: .88rem;
+      background: var(--white);
+      color: var(--maroon);
+      border: 1px solid var(--maroon);
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+    }
+    .btn-outline:disabled {
+      color: var(--gray-400);
+      border-color: var(--gray-200);
+      cursor: not-allowed;
+    }
+    .btn-outline:not(:disabled):hover { background: var(--maroon-soft); }
+
+    .gs-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .5rem;
+      margin-top: .9rem;
+      padding-top: .9rem;
+      border-top: 1px dashed var(--gray-100);
+    }
+    .gs-row .label-inline { color: var(--gray-600); font-size: .88rem; margin-right: .25rem; }
+    .gs-row .spacer { flex: 1; }
+    .gs-row select {
+      padding: .45rem .6rem;
+      font-size: .88rem;
+      border: 1px solid var(--gray-200);
+      border-radius: 6px;
+      background: var(--white);
+      color: var(--gray-900);
+      max-width: 100%;
+    }
+    .gs-row select:disabled { background: var(--gray-50); color: var(--gray-400); }
+
+    /* error banner */
+    .error {
+      margin: 1rem 0;
+      padding: .75rem 1rem;
+      background: var(--maroon-soft);
+      border: 1px solid #e5c4ca;
+      color: var(--maroon);
+      border-radius: 8px;
+      font-size: .92rem;
+    }
+
+    /* meta header del risultato */
+    .result-head {
+      margin: 1.5rem 0 .75rem;
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: .6rem;
+    }
+    .result-head h2 { margin: 0; font-size: 1.15rem; }
+    .badge {
+      display: inline-block;
+      padding: .12rem .55rem;
+      background: var(--maroon-soft);
+      color: var(--maroon);
+      border-radius: 999px;
+      font-size: .78rem;
+      font-weight: 600;
+      letter-spacing: .02em;
+    }
+    .badge.neutral {
+      background: var(--gray-100);
+      color: var(--gray-600);
+    }
+    .meta-line { margin: .25rem 0; color: var(--gray-600); font-size: .88rem; word-break: break-all; }
+    .meta-line strong { color: var(--gray-900); font-weight: 600; margin-right: .3rem; }
+
+    /* collapsible html */
+    details.html-box { margin: 1rem 0; }
+    details.html-box > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: .6rem .85rem;
+      background: var(--white);
+      border: 1px solid var(--gray-100);
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: .9rem;
+      color: var(--gray-900);
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    details.html-box > summary::-webkit-details-marker { display: none; }
+    details.html-box > summary::before {
+      content: "▸";
+      color: var(--gray-400);
+      font-size: .75rem;
+      transition: transform .15s;
+    }
+    details.html-box[open] > summary::before { transform: rotate(90deg); }
+    details.html-box > summary .hint {
+      color: var(--gray-400);
+      font-weight: 400;
+      font-size: .78rem;
+      margin-left: auto;
+    }
+    details.html-box[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 0; }
+    details.html-box .html-pre {
+      margin: 0;
+      border: 1px solid var(--gray-100);
+      border-top: 0;
+      border-radius: 0 0 8px 8px;
+      padding: .75rem;
+      max-height: 260px;
+      overflow: auto;
+      background: var(--gray-50);
+      font-size: .78rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--gray-600);
+    }
+
+    /* griglia testi */
+    .texts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+    }
+    .texts.single { grid-template-columns: 1fr; }
+    .text-card {
+      background: var(--white);
+      border: 1px solid var(--gray-100);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .text-card .head {
+      padding: .55rem .85rem;
+      background: var(--gray-50);
+      border-bottom: 1px solid var(--gray-100);
+      font-size: .82rem;
+      font-weight: 600;
+      letter-spacing: .02em;
+      color: var(--gray-900);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .text-card .head .kind {
+      margin-left: auto;
+      color: var(--gray-400);
+      font-weight: 500;
+      font-size: .72rem;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+    .text-card .body {
+      padding: .85rem 1rem;
+      max-height: 420px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      font-size: .92rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--gray-900);
+    }
+
+    /* metriche */
+    .metrics { margin-top: 1.5rem; }
+    .metrics h3 {
+      margin: 0 0 .75rem;
+      font-size: 1.05rem;
+    }
+
+    .metric-group { margin-bottom: 1.25rem; }
+    .metric-group h4 {
+      margin: 0 0 .5rem;
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--gray-600);
+    }
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: .6rem;
+    }
+    .metric-grid.wide { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+    .metric {
+      background: var(--white);
+      border: 1px solid var(--gray-100);
+      border-radius: 8px;
+      padding: .75rem .9rem;
+    }
+    .metric .name {
+      font-size: .78rem;
+      color: var(--gray-600);
+      letter-spacing: .02em;
+      display: flex;
+      align-items: baseline;
+      gap: .3rem;
+    }
+    .metric .name .sub { color: var(--gray-400); font-size: .7rem; }
+    .metric .value {
+      font-size: 1.45rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      margin-top: .1rem;
+      color: var(--gray-900);
+    }
+    .metric .bar {
+      height: 4px;
+      margin-top: .55rem;
+      background: var(--gray-100);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .metric .bar > span {
+      display: block;
+      height: 100%;
+      background: var(--maroon);
+      border-radius: 2px;
+    }
+
+    footer.foot {
+      margin-top: 2.5rem;
+      color: var(--gray-400);
+      font-size: .78rem;
+      text-align: center;
+    }
+    footer.foot .names { color: var(--gray-600); font-weight: 500; }
+
+    @media (max-width: 720px) {
+      .texts { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: 1fr 1fr; }
+      .search form { flex-direction: column; }
+      .btn-primary { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="hero">
+      <img src="/static/minerva.webp" alt="Minerva NLP" class="logo">
+      <h1>Minerva Parser<span class="dot">.</span></h1>
+    </header>
+
+    <section class="card search">
+      <form method="get" action="/">
+        <input type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
+        <button class="btn-primary" type="submit">Parse</button>
+      </form>
+
+      {% if domains %}
+      <div class="gs-row">
+        <span class="label-inline">oppure dal gold standard:</span>
+        <select id="gs-domain">
+          <option value="">— dominio —</option>
+          {% for d in domains %}
+          <option value="{{ d }}">{{ d }}</option>
+          {% endfor %}
+        </select>
+        <select id="gs-url" disabled>
+          <option value="">— url —</option>
+        </select>
+        <span class="spacer"></span>
+        <button class="btn-outline" type="button" id="gs-go" disabled>Parse dal GS</button>
+      </div>
+      <script>
+        const fullGs = {{ full_gs | tojson }};
+        const selDomain = document.getElementById("gs-domain");
+        const selUrl = document.getElementById("gs-url");
+        const btnGo = document.getElementById("gs-go");
+
+        selDomain.addEventListener("change", () => {
+          selUrl.innerHTML = '<option value="">— url —</option>';
+          const entries = fullGs[selDomain.value] || [];
+          for (const e of entries) {
+            const opt = document.createElement("option");
+            opt.value = e.url;
+            opt.textContent = e.title || e.url;
+            selUrl.appendChild(opt);
+          }
+          selUrl.disabled = entries.length === 0;
+          btnGo.disabled = true;
+        });
+        selUrl.addEventListener("change", () => { btnGo.disabled = !selUrl.value; });
+        btnGo.addEventListener("click", () => {
+          if (selUrl.value) window.location.href = "/?url=" + encodeURIComponent(selUrl.value);
+        });
+      </script>
+      {% else %}
+      <div class="gs-row">
+        <span class="label-inline">backend non raggiungibile: nessun dominio disponibile.</span>
+      </div>
+      {% endif %}
+    </section>
+
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+
+    {% if parse_result %}
+    <div class="result-head">
+      <h2>Risultato</h2>
+      <span class="badge">{{ parse_result.domain }}</span>
+      {% if gs_entry %}<span class="badge neutral">nel gold standard</span>{% endif %}
+    </div>
+    <p class="meta-line"><strong>URL</strong>{{ parse_result.url }}</p>
+    <p class="meta-line"><strong>Titolo</strong>{{ parse_result.title }}</p>
+
+    <details class="html-box">
+      <summary>html text <span class="hint">clicca per espandere</span></summary>
+      <pre class="html-pre">{{ parse_result.html_text }}</pre>
+    </details>
+
+    {% if gs_entry %}
+    <div class="texts">
+      <div class="text-card">
+        <div class="head">parsed text <span class="kind">markdown</span></div>
+        <div class="body">{{ parse_result.parsed_text }}</div>
+      </div>
+      <div class="text-card">
+        <div class="head">gold text <span class="kind">plain</span></div>
+        <div class="body">{{ gs_entry.gold_text }}</div>
+      </div>
+    </div>
+    {% else %}
+    <div class="texts single">
+      <div class="text-card">
+        <div class="head">parsed text <span class="kind">markdown</span></div>
+        <div class="body">{{ parse_result.parsed_text }}</div>
+      </div>
+    </div>
+    <p class="meta-line" style="margin-top:.75rem;">URL non nel gold standard: evaluation non disponibile.</p>
+    {% endif %}
+
+    {% if evaluation %}
+    <section class="metrics">
+      <h3>Evaluation</h3>
+
+      <div class="metric-group">
+        <h4>token-level</h4>
+        <div class="metric-grid">
+          <div class="metric">
+            <div class="name">precision</div>
+            <div class="value">{{ "%.4f"|format(evaluation.token_level_eval.precision) }}</div>
+            <div class="bar"><span style="width: {{ (evaluation.token_level_eval.precision * 100)|round(1) }}%"></span></div>
+          </div>
+          <div class="metric">
+            <div class="name">recall</div>
+            <div class="value">{{ "%.4f"|format(evaluation.token_level_eval.recall) }}</div>
+            <div class="bar"><span style="width: {{ (evaluation.token_level_eval.recall * 100)|round(1) }}%"></span></div>
+          </div>
+          <div class="metric">
+            <div class="name">f1</div>
+            <div class="value">{{ "%.4f"|format(evaluation.token_level_eval.f1) }}</div>
+            <div class="bar"><span style="width: {{ (evaluation.token_level_eval.f1 * 100)|round(1) }}%"></span></div>
+          </div>
+        </div>
+      </div>
+
+      {% if evaluation.x_eval.rouge_1 %}
+      <div class="metric-group">
+        <h4>rouge-1</h4>
+        <div class="metric-grid">
+          <div class="metric">
+            <div class="name">precision</div>
+            <div class="value">{{ "%.4f"|format(evaluation.x_eval.rouge_1.precision) }}</div>
+            <div class="bar"><span style="width: {{ (evaluation.x_eval.rouge_1.precision * 100)|round(1) }}%"></span></div>
+          </div>
+          <div class="metric">
+            <div class="name">recall</div>
+            <div class="value">{{ "%.4f"|format(evaluation.x_eval.rouge_1.recall) }}</div>
+            <div class="bar"><span style="width: {{ (evaluation.x_eval.rouge_1.recall * 100)|round(1) }}%"></span></div>
+          </div>
+          <div class="metric">
+            <div class="name">f1</div>
+            <div class="value">{{ "%.4f"|format(evaluation.x_eval.rouge_1.f1) }}</div>
+            <div class="bar"><span style="width: {{ (evaluation.x_eval.rouge_1.f1 * 100)|round(1) }}%"></span></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <div class="metric-group">
+        <h4>altre metriche</h4>
+        <div class="metric-grid wide">
+          {% if evaluation.x_eval.chrf is defined %}
+          <div class="metric">
+            <div class="name">chrF</div>
+            <div class="value">{{ "%.4f"|format(evaluation.x_eval.chrf) }}</div>
+            <div class="bar"><span style="width: {{ (evaluation.x_eval.chrf * 100)|round(1) }}%"></span></div>
+          </div>
+          {% endif %}
+          {% if evaluation.x_eval.noise_ratio is defined %}
+          <div class="metric">
+            <div class="name">noise ratio <span class="sub">1 − precision</span></div>
+            <div class="value">{{ "%.4f"|format(evaluation.x_eval.noise_ratio) }}</div>
+            <div class="bar"><span style="width: {{ (evaluation.x_eval.noise_ratio * 100)|round(1) }}%"></span></div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+    {% endif %}
+    {% endif %}
+
+    <footer class="foot">
+      <span class="names">Cillo · Lobello · Mazzocco</span>
+    </footer>
+  </div>
+</body>
+</html>
