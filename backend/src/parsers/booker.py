@@ -65,7 +65,7 @@ class BookerParser(Parser):
         final_url = url if raw_html is not None else (getattr(result, "url", None) or url)
 
         return ParsedDocument(
-            url=url,
+            url=final_url,
             domain=urlparse(url).netloc,
             title=self._extract_titile(result, final_url),
             html_text=result.cleaned_html,
