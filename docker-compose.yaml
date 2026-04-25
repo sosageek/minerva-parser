@@ -9,3 +9,14 @@ services:
       GS_DATA_DIR: /app/gs_data
     volumes:
       - ./gs_data:/app/gs_data
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: minerva-frontend
+    ports:
+      - "8004:8004"
+    environment:
+      BACKEND_URL: http://backend:8003
+    depends_on:
+      - backend
