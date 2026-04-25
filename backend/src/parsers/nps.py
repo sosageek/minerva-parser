@@ -123,7 +123,7 @@ class NpsParser(Parser):
             stringa di testo normalizzato
         """
 
-        text = self._truncate_terminal_sections(text)
+        text = self._RE_TERMINAL_SECTIONS.split(text, maxsplit=1)[0]
         text = self._RE_LAST_UPDATED.sub('', text)
         text = self._RE_INLINE_TAGS.sub('', text)
         text = self._RE_IMAGE_ALT.sub('', text)
@@ -140,21 +140,6 @@ class NpsParser(Parser):
 
 
 # ---------------------------------- HELPER PRIVATI ----------------------------------
-
-    def _truncate_terminal_sections(self, text: str) -> str:
-        """Taglia il testo alla prima sezione terminale (Contact Us, Related Links, ...)
-
-        le sezioni terminali a partire da cui viene troncato il testo sono definite in ``_RE_TERMINAL_SECTIONS``
-
-        Args:
-            text(str): testo informativo con sezioni terminali
-
-        Returns:
-            testo senza sezioni terminali
-        """
-
-        return self._RE_TERMINAL_SECTIONS.split(text, maxsplit=1)[0]
-
 
     def _remove_urls(self, text: str) -> str:
         """Cancella URL residui sia tra parentesi tonde sia nudi nel testo

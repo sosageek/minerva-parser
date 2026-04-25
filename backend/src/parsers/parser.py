@@ -34,6 +34,8 @@ class Parser(ABC):
         crawler_config(CrawlerRunConfig): configurazione della run di crawling specifica del parser
     """
 
+# ---------------------------------- CONFIG CRAWL4AI ----------------------------------
+
     def __init__(self, excluded_selector: str = "", target_elements: list[str] | None = None):
         """Inizializza la configurazione della run di crawling
 
@@ -80,6 +82,7 @@ class Parser(ABC):
             )
         return result
     
+# ---------------------------------- METODI ASTRATTI ----------------------------------
 
     @abstractmethod
     async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
