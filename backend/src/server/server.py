@@ -318,8 +318,9 @@ async def full_gs_eval(
 
     for entry in entries:
         url = entry["url"]
+        html_text = entry.get("html_text")
         try:
-            doc = await _do_parse(url)
+            doc = await _do_parse(url, html_text)
         except HTTPException as err:
             logger.warning("full_gs_eval: skip %s (%s)", url, err.detail)
             failed.append(url)
