@@ -21,36 +21,25 @@ templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
 app = FastAPI(
     title="Minerva Parser Frontend",
-    description="UI minimale per il parser: input URL, GS dropdown ed evaluation",
+    description="input URL, evaluation",
 )
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 
 def _extract_domain(url: str) -> str | None:
-    """Estrae netloc da un URL
-
-    Args:
-        url: URL fornito dall'utente
-
-    Returns:
-        netloc o ``None`` se l'URL è malformato
-    """
+    """netloc dell'URL, None se malformato"""
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
-        return None
+        return None                            #scarta scheme malformati, backend risponde 400
     return parsed.netloc
 
 
 async def _fetch_domains(client: httpx.AsyncClient) -> list[str]:
-    """Lista dei domini supportati dal backend
-
-    Returns:
-        lista ordinata di netloc o lista vuota se il backend non risponde
-    """
+    """domini supportati dal backend, [] se non risponde"""
     try:
         resp = await client.get(f"{BACKEND_URL}/domains")
         resp.raise_for_status()
-        return resp.json().get("domains", [])
+        return resp.json().get("domains", [])       #lista netloc
     except httpx.HTTPError as err:
         logger.warning("impossibile recuperare /domains: %s", err)
         return []
@@ -60,19 +49,9 @@ async def _fetch_full_gs(
     client: httpx.AsyncClient,
     domains: list[str],
 ) -> dict[str, list[dict]]:
-    """Carica tutte le entry del GS per ogni dominio supportato
-
-    nota: serve a popolare il dropdown cascata ``dominio -> url``
-
-    Args:
-        client: client http condiviso
-        domains: lista dei netloc
-
-    Returns:
-        mappa ``dominio -> lista di entry del GS`` (solo url e title lato client)
-    """
+    """mappa dominio a {url,title} per popolare dropdown a cascata"""
     gs: dict[str, list[dict]] = {}
-    for domain in domains:
+    for domain in domains:                      # home alla prima visita ci metteva il triplo se parallel (Mazz)
         try:
             resp = await client.get(
                 f"{BACKEND_URL}/full_gold_standard",
@@ -89,19 +68,33 @@ async def _fetch_full_gs(
     return gs
 
 
+# async def _fetch_full_gs_parallel(
+#     client: httpx.AsyncClient,
+#     domains: list[str],
+# ) -> dict[str, list[dict]]:
+# 
+#     import asyncio
+#     coros = [
+#         client.get(f"{BACKEND_URL}/full_gold_standard", params={"domain": d})
+#         for d in domains
+#     ]
+#     resps = await asyncio.gather(*coros, return_exceptions=True)
+#     gs: dict[str, list[dict]] = {}
+#     for domain, resp in zip(domains, resps):
+#         if isinstance(resp, Exception) or resp.status_code >= 400:
+#             gs[domain] = []
+#             continue
+#         entries = resp.json().get("gold_standard", [])
+#         gs[domain] = [{"url": e["url"], "title": e["title"]} for e in entries]
+#     return gs
+
+
 async def _fetch_gs_entry(
     client: httpx.AsyncClient,
     url: str,
 ) -> dict | None:
-    """Entry del GS per un URL (se presente)
-
-    Args:
-        client: client http condiviso
-        url: URL assoluto
-
-    Returns:
-        entry del GS o ``None`` se l'URL non è nel GS o se il backend risponde con errore
-    """
+    """entry del GS per l'url"""
+                       #ritorna None se l'URL non in GS o se il backend risponde con errore
     try:
         resp = await client.get(
             f"{BACKEND_URL}/gold_standard",
@@ -120,18 +113,13 @@ async def _fetch_parse(
     client: httpx.AsyncClient,
     url: str,
 ) -> tuple[dict | None, str | None]:
-    """Chiama GET /parse del backend
-
-    Args:
-        client: client http condiviso
-        url: URL assoluto da parsare
-
-    Returns:
-        ``(parse_output, None)`` in caso di successo, ``(None, messaggio)`` altrimenti
-    """
+    """GET /parse del backend; (output, None) o (None, errore)"""
     try:
         resp = await client.get(f"{BACKEND_URL}/parse", params={"url": url})
         if resp.status_code >= 400:
+            # Difesa contro proxy/intermediari che, su 5xx, ritornano una
+            # pagina HTML invece del JSON nostro: in quel caso resp.json()
+            # solleva ValueError e perdiamo il messaggio di errore vero.
             try:
                 detail = resp.json().get("detail", resp.text)
             except ValueError:
@@ -142,17 +130,16 @@ async def _fetch_parse(
         logger.warning("parse fallito per %s: %s", url, err)
         return None, f"backend irraggiungibile: {err}"
 
+    #  provato il retry 502 503
+    # ma 502 capita solo durante lifespan del backend (carica i GS dal disco, 10s ). (Mazz)
+
 
 async def _fetch_evaluate(
     client: httpx.AsyncClient,
     parsed_text: str,
     gold_text: str,
-) -> dict | None:
-    """Chiama POST /evaluate del backend
-
-    Returns:
-        ``ParseEvaluation`` come dict o ``None`` se la chiamata fallisce
-    """
+) -> dict | None:                   #chiama post /evaluate da backend
+    """ParseEvaluation dict, None se la chiamata fallisce"""
     try:
         resp = await client.post(
             f"{BACKEND_URL}/evaluate",
@@ -168,20 +155,13 @@ async def _fetch_evaluate(
 @app.get("/", response_class=HTMLResponse)
 async def index(
     request: Request,
-    url: str | None = Query(default=None, description="URL da parsare"),
+    url: str | None = Query(default=None, description="URL da parsare"),   #file html
 ) -> HTMLResponse:
-    """Pagina unica del frontend
+    """home page; con ?url= esegue parse + (se nel GS) evaluate"""
 
-    * senza ``url``: renderizza il form con il dropdown dei GS
-    * con ``url``: esegue il parse e, se l'URL è nel GS, calcola le metriche
+    # senza url: renderizza form con il dropdown GS
+    #con url esegue il parse
 
-    Args:
-        request: oggetto richiesta (richiesto da Jinja2Templates)
-        url: URL passato come query string dal form o dal dropdown
-
-    Returns:
-        HTML renderizzato da ``index.html``
-    """
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         domains = await _fetch_domains(client)
         full_gs = await _fetch_full_gs(client, domains)

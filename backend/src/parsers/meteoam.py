@@ -9,13 +9,12 @@ from ..utils.cleaning import remove_markup, normalize_whitespace
 class MeteoAmParser(Parser):
     """Parser per le pagine di meteoam.it
 
-    * isola il contenuto editoriale degli articoli news
-    * scarta header articolo, side col, gallerie immagini e i moduli potrebbe piacerti anche / articoli recenti
+    * isola il contenuto
+    * scarta header articolo, side col, gallerie immagini, moduli potrebbe piacerti anche / articoli recenti
 
-    gli excluded selectors vengono passati direttamente a crawl4ai (non via beautiful soup come per wikipedia) perché qui i nodi da rimuovere sono section/div ben delimitati e non mangiano il tail text adiacente
+    excluded selectors  passati direttamente a crawl4ai senza beautiful soup 
     """
 
-# ---------------------------------- SELETTORI ----------------------------------
 
     _EXCLUDED_SELECTORS = (
         "a.news-details-header-go-back, "
@@ -24,23 +23,40 @@ class MeteoAmParser(Parser):
         "section[data-wcs-title='Articoli recenti'], "
         "section[data-web-app='EditorImageGallery'], "
         "section[data-web-app='ArticleHeader'], "
-        # banner cookie iubenda: sugli articoli del GS sta già fuori da
-        # section#details_news_page, qui serve solo per la fallback path
+        # banner cookie iubenda: su GS sta già fuori da
+        # section#details_news_page, qui serve solo per fallback (Mazz)
         "#iubenda-cs-banner, "
         ".iubenda-cs-container, "
         "[id^='iubenda-cs']"
     )
     _TARGET_ELEMENTS = ["section#details_news_page"]
 
-# ------------------------------------ REGEX -------------------------------------
 
-    # safety net se articoli correlati e photo gallery dovessero resistere alla rimozione degli excluded selectors
+    #se articoli correlati e photo gallery resistono alla rimozione da excluded selectors
     _RE_RELATED = re.compile(
         r'Potrebbe piacerti anche.*',
         re.DOTALL | re.IGNORECASE,
     )
     _RE_BACK_LINK = re.compile(r'←\s*Torna agli articoli\s*\n?', re.IGNORECASE)
     _RE_GALLERY = re.compile(r'^Galleria Fotografica\s*\n?', re.MULTILINE | re.IGNORECASE)
+
+    # widget satellite (vedi /meteosat): titolo CMS + heading "Caricamento Dati"
+    # + timestamp dinamico GMT+n + "Refresh automatico attivo" + slide indicator
+    # del carousel. Tutti dinamici, non sono nel gold. (Mazz)
+    _RE_WIDGET_TITLE = re.compile(r'^Widget semplice con gallerie multiple\s*$', re.MULTILINE)
+    _RE_LOADING = re.compile(r'^#####\s*Caricamento Dati\s*$', re.MULTILINE)
+    _RE_TIMESTAMP = re.compile(
+        r'^\d{1,2}\s+[a-zA-Z]+\s+\d{4},\s*\d{1,2}:\d{2}(?::\d{2})?\s*GMT[+\-]\d+\s*$',
+        re.MULTILINE,
+    )
+    _RE_REFRESH = re.compile(r'^\(Refresh automatico attivo\)\s*$', re.MULTILINE)
+    _RE_SLIDE = re.compile(
+        r'^\d{1,2}/\d{1,2}:\s*\d{1,2}\s+[a-zA-Z]+\s+\d{4}\s*\|\s*\d{1,2}:\d{2}\s*(?:AM|PM)\s*UTC\s*$',
+        re.MULTILINE,
+    )
+    # i gold di meteoam non usano i marker ## per i sottotitoli, li strippiamo
+    # mantenendo solo il testo. cattura anche i casi orfani (## su riga vuota)
+    _RE_HEADING_MARK = re.compile(r'^#{1,6}[ \t]*', re.MULTILINE)
 
     _RE_TITLE_BRAND = re.compile(
         r'^\s*Meteo\s+Aeronautica\s+Militare\s*\|\s*'
@@ -54,29 +70,28 @@ class MeteoAmParser(Parser):
             target_elements=self._TARGET_ELEMENTS
         )
 
-# ---------------------------------- METODI PUBBLICI ----------------------------------
 
     async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
-        """Applica la pipeline di fetching-parsing specifica per meteoam.it
-        a partire dall'url o dall'html della pagina
+        """Applica la pipeline di parsing
 
         Args:
-            url(str): url della pagina da scaricare
+            url(str): pagina da scaricare
             raw_html(str | None): HTML sorgente opzionale
 
         Returns:
-            istanza di ``ParsedDocument`` con ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``
+            istanza di ParsedDocument con url, domain, title, html_text e parsed_text
 
         Raises:
             CrawlError: se il fetch della pagina fallisce (lo lancia la chiamata interna a ``_fetch``)
         """
 
+        # /meteosat ha 5 widget gallery che si idratano lato client: senza delay
+        # mancano i loro <h2>. Solo qui paghiamo 3s, gli altri URL restano veloci. (Mazz)
+        self.crawler_config.delay_before_return_html = 3.0 if "/meteosat" in url else 0
         result = await self._fetch(url, raw_html=raw_html)
 
-        # gli articoli vivono dentro section#details_news_page e il primo fetch li copre tutti
-        # le pagine non-articolo (regioni, schede prodotto, sezioni tematiche) non hanno quel
-        # selettore: target_elements filtra tutto e il markdown esce vuoto. in quel caso
-        # rifacciamo il giro senza target restrittivi, tenendo solo gli excluded selectors
+        #a pagine non-articolo target_elements filtra tutto e il markdown esce vuoto.
+        # rifacciamo giro senza target restrittivi, tenendo solo gli excluded selectors
         if not (result.markdown or "").strip():
             result = await self._fetch(url, raw_html=raw_html, config=self._fallback_config())
 
@@ -89,13 +104,13 @@ class MeteoAmParser(Parser):
         )
 
     def normalize(self, text: str) -> str:
-        """Applica pipeline di pulizia specifica al testo markdown
-        estratto da una pagina meteoam.it con crawl4ai
+        """Applica pipeline di pulizia al testo markdown
 
-        include la rimozione del link "torna agli articoli", il taglio della coda "potrebbe piacerti anche" residua, la cancellazione del sottotitolo "Galleria Fotografica" rimasto orfano e la pulizia del markup md generale
+        include rimozione del link "torna agli articoli", il taglio della coda "potrebbe piacerti anche" residua,
+        cancellazione del sottotitolo "Galleria Fotografica" rimasto orfano e la pulizia del markup md generale
 
         Args:
-            text(str): testo markdown grezzo generato da crawl4ai
+            text(str): testo markdown grezzo da crawl4ai
 
         Returns:
             stringa di testo normalizzato
@@ -104,20 +119,26 @@ class MeteoAmParser(Parser):
         text = self._RE_BACK_LINK.sub('', text)
         text = self._RE_RELATED.sub('', text)
         text = self._RE_GALLERY.sub('', text)
+        text = self._RE_WIDGET_TITLE.sub('', text)
+        text = self._RE_LOADING.sub('', text)
+        text = self._RE_TIMESTAMP.sub('', text)
+        text = self._RE_REFRESH.sub('', text)
+        text = self._RE_SLIDE.sub('', text)
+        text = self._RE_HEADING_MARK.sub('', text)
         text = remove_markup(text)
         text = normalize_whitespace(text)
         return text.strip()
     
-# ---------------------------------- HELPER PRIVATI ----------------------------------
+
 
     def _fallback_config(self) -> CrawlerRunConfig:
-        """Config alternativa per pagine meteoam.it senza ``section#details_news_page``
+        """Config alternativa per pagine meteoam.it senza section#details_news_page
 
         nota: stessi excluded selectors e stessi excluded tags della config principale,
-        ma ``target_elements`` vuoto così crawl4ai estrae tutto il body al netto di nav/aside
+        ma target_elements vuoto così crawl4ai estrae tutto il body al netto di nav/aside
 
         Returns:
-            ``CrawlerRunConfig`` da usare come secondo tentativo se il primo torna vuoto
+            CrawlerRunConfig da usare come secondo tentativo se primo torna vuoto
         """
 
         return CrawlerRunConfig(
@@ -132,15 +153,15 @@ class MeteoAmParser(Parser):
         """Estrae il titolo della pagina
 
         * preferisce il contenuto del tag ``<title>`` html
-        * rimuove il brand Meteo Aeronautica Militare sia che se prefisso sia se suffisso
+        * rimuove brand Meteo Aeronautica Militare sia che se prefisso sia se suffisso
         * fallback sull'ultimo segmento del path
 
         Args:
-            result(CrawlResult): risultato di crawl4ai con il metadata del tag ``<title>``
+            result(CrawlResult): risultato di crawl4ai con metadata del tag <title>
             url(str): URL completo della pagina (usato come fallback)
 
         Returns:
-            il titolo della pagina pulito dal brand, o un fallback estratto dall'URL
+            titolo della pagina pulito dal brand, o fallback estratto dall'URL
         """
 
         metadata = getattr(result, "metadata", None)
@@ -152,6 +173,7 @@ class MeteoAmParser(Parser):
                 return title
 
         slug = unquote(urlparse(url).path.rstrip('/').split('/')[-1])
+        slug = re.sub(r'-\d{8}$', '', slug)  # toglie suffisso data ISO (es. "-20250422") (Mazz)
         slug = slug.replace('--', ': ')  # "--" negli slug meteoam codifica ": " nel titolo originale
         slug = slug.replace('-', ' ').strip()
         return slug or "(meteoam.it)"

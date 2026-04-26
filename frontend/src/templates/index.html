@@ -4,763 +4,282 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minerva Parser</title>
-  <link rel="icon" type="image/webp" href="/static/minerva.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&display=swap&subset=latin,latin-ext" rel="stylesheet">
+  <link rel="icon" type="image/png" href="/static/minerva.png">
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;600;700&display=swap&subset=latin,latin-ext" rel="stylesheet">
   <style>
-    /* palette a 3 colori: maroon minerva, bianco, grigio neutro
-       griglia bento aggressiva, bordi quadri, sfalso a scaletta
-       tutte le spaziature sono multipli di 8px */
     :root {
-      --maroon: #862633;
-      --maroon-dark: #6b1e29;
-      --maroon-soft: #f4e5e8;
-      --white: #ffffff;
-      --gray-50: #f6f6f7;
-      --gray-100: #ececee;
-      --gray-200: #d9d9dd;
-      --gray-400: #8a8a92;
-      --gray-600: #55555c;
-      --gray-900: #1a1a1e;
-
-      --radius: 4px;
-      --border-w: 2px;
-      --shadow-rest: 0 2px 0 rgba(26, 26, 30, .04);
-      --shadow-hover: 0 8px 0 var(--maroon-dark);
-      --ease: cubic-bezier(.22, .61, .36, 1);
+      --maroon: #862633;   /* di minerva nlp */
+      --ink: #1a1a1e;
+      --paper: #fff;
     }
-
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
     body {
-      font-family: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      background: var(--gray-50);
-      color: var(--gray-900);
-      line-height: 1.5;
-      font-size: 14px;
-      min-height: 100vh;
+      margin: 0;
+      font: 14px/1.5 "Geist Mono", ui-monospace, Menlo, Consolas, monospace;
+      background: rgba(26, 26, 30, .03);
+      color: var(--ink);
     }
-    a { color: var(--maroon); text-decoration: none; }
-    a:hover { text-decoration: underline; }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 32px 24px 64px; }
 
-    .wrap {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 32px 24px 64px;
-    }
-
-    /* ===== bento grid aggressiva =====
-       12 col, gap 16px. lo sfalso è dato da `margin-top` su cell selezionate:
-       un offset di 24/40px sulle card secondarie crea la scaletta verticale
-       senza rompere l'allineamento di base */
-    .bento {
+    /* sfalso sui box secondari compensa otticamente il peso del pannello brand a sinistra. */
+    .layout {
       display: grid;
       grid-template-columns: repeat(12, 1fr);
-      grid-auto-rows: minmax(80px, auto);
       gap: 16px;
     }
-
-    .cell {
-      background: var(--white);
-      border: var(--border-w) solid var(--gray-900);
-      border-radius: var(--radius);
+    .layout__panel {
+      background: var(--paper);
+      border: 2px solid var(--ink); border-radius: 4px;
       padding: 24px;
-      box-shadow: var(--shadow-rest);
-      transition:
-        transform .25s var(--ease),
-        box-shadow .25s var(--ease),
-        background .25s var(--ease);
-      display: flex;
-      flex-direction: column;
-      min-width: 0;
     }
-    .cell.is-hoverable:hover {
-      transform: translate(-4px, -4px);
-      box-shadow: 8px 8px 0 var(--gray-900);
+
+    .layout__panel--brand, .layout__panel--search { grid-row: span 2; }
+    .layout__panel--brand {
+      grid-column: span 5;
+      background: var(--maroon); color: var(--paper);
+      display: flex; align-items: center;
     }
-    .cell.is-accent {
-      background: var(--maroon);
-      color: var(--white);
-      border-color: var(--gray-900);
-    }
-    .cell.is-accent.is-hoverable:hover {
-      box-shadow: 8px 8px 0 var(--maroon-dark);
-    }
-    .cell.is-accent .eyebrow,
-    .cell.is-accent .meta { color: rgba(255, 255, 255, .8); }
-    .cell.is-accent h1 { color: var(--white); }
+    .layout__panel--search { grid-column: span 7; margin-top: 24px; }
+    .layout__panel--parsed { grid-column: span 7; }
+    .layout__panel--gold   { grid-column: span 5; margin-top: 24px; }
+    .layout__panel--metric { grid-column: span 4; }
+    .layout__panel--metric.is-rouge { margin-top: 16px; }
+    .layout__panel--metric.is-extra { margin-top: 32px; }
+    .layout__panel--meta,
+    .layout__panel--html,
+    .layout__panel--error,
+    .layout__panel--parsed.is-full { grid-column: span 12; }
+    .layout__panel--html { margin-top: 8px; }
+    .layout__panel--error { background: rgba(134, 38, 51, .12); border-color: #6b1e29; color: #6b1e29; }
 
-    /* slot bento — header, sfalsi a scaletta */
-    .cell--brand    { grid-column: span 5; grid-row: span 2; }
-    .cell--search   { grid-column: span 7; grid-row: span 2; margin-top: 24px; }
-
-    .cell--meta     { grid-column: span 12; }
-    .cell--html     { grid-column: span 12; margin-top: 8px; }
-
-    .cell--parsed   { grid-column: span 7; }
-    .cell--gold     { grid-column: span 5; margin-top: 24px; }
-    .cell--parsed.is-full { grid-column: span 12; }
-
-    .cell--m-token  { grid-column: span 4; }
-    .cell--m-rouge  { grid-column: span 4; margin-top: 16px; }
-    .cell--m-extra  { grid-column: span 4; margin-top: 32px; }
-
-    .cell--error    { grid-column: span 12; background: var(--maroon-soft); border-color: var(--maroon-dark); color: var(--maroon-dark); }
-
+    /* mobile tutto in colonna singola */
     @media (max-width: 960px) {
-      .cell--brand, .cell--search, .cell--parsed, .cell--gold,
-      .cell--m-token, .cell--m-rouge, .cell--m-extra {
-        grid-column: span 12;
-        grid-row: span 1;
-        margin-top: 0;
-      }
+      .layout__panel { grid-column: span 12 !important; grid-row: auto !important; margin-top: 0 !important; }
     }
 
-    /* ===== brand ===== */
-    .brand-top { display: flex; align-items: center; gap: 24px; }
-    .brand-logo {
-      width: 128px;
-      height: 128px;
-      object-fit: contain;
-      background: var(--white);
-      padding: 8px;
-      border: var(--border-w) solid var(--gray-900);
-      border-radius: var(--radius);
-      flex-shrink: 0;
-    }
-    .cell--brand { justify-content: center; }
-    .cell--brand h1 {
-      font-family: "Geist Mono", monospace;
-      font-size: 2rem;
-      margin: 0;
-      letter-spacing: -0.02em;
-      font-weight: 700;
-      line-height: 1;
-    }
-    .cell--brand h1 .dot { color: rgba(255, 255, 255, .6); }
-    .eyebrow {
-      font-size: .7rem;
-      text-transform: uppercase;
-      letter-spacing: .16em;
-      color: var(--gray-400);
-      font-weight: 600;
-      margin: 0 0 8px;
-    }
+    /* transizione pannelli: traslazione 4px + ombra netta. Riattivare se non da problemi (Mazz)
+    .layout__panel { transition: transform .2s, box-shadow .2s; }
+    .layout__panel:hover { transform: translate(-4px, -4px); box-shadow: 8px 8px 0 var(--ink); }
+    .layout__panel--brand:hover { box-shadow: 8px 8px 0 #6b1e29; }
+    */
 
-    /* ===== search ===== */
-    .search-row { display: flex; gap: 8px; }
-    .search-row input[type=text] {
-      flex: 1;
-      padding: 16px;
-      font-family: inherit;
-      font-size: .85rem;
-      border: var(--border-w) solid var(--gray-900);
-      border-radius: var(--radius);
-      background: var(--white);
-      color: var(--gray-900);
-      transition: box-shadow .2s var(--ease);
-      min-width: 0;
-    }
-    .search-row input[type=text]:focus {
-      outline: none;
-      box-shadow: 4px 4px 0 var(--maroon);
-    }
-    .btn {
-      font-family: inherit;
-      font-weight: 600;
-      cursor: pointer;
-      border-radius: var(--radius);
-      transition:
-        transform .18s var(--ease),
-        box-shadow .18s var(--ease),
-        background .18s var(--ease),
-        color .18s var(--ease);
-    }
-    .btn:active { transform: translate(2px, 2px); box-shadow: none !important; }
-    .btn-primary {
-      padding: 16px 32px;
-      font-size: .85rem;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      background: var(--maroon);
-      color: var(--white);
-      border: var(--border-w) solid var(--gray-900);
-    }
-    .btn-primary:hover {
-      background: var(--maroon-dark);
-      transform: translate(-2px, -2px);
-      box-shadow: 4px 4px 0 var(--gray-900);
-    }
-    .btn-outline {
-      padding: 8px 16px;
-      font-size: .75rem;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      background: var(--white);
-      color: var(--maroon);
-      border: var(--border-w) solid var(--maroon);
-    }
-    .btn-outline:hover:not(:disabled) {
-      background: var(--maroon);
-      color: var(--white);
-      transform: translate(-2px, -2px);
-      box-shadow: 4px 4px 0 var(--maroon-dark);
-    }
-    .btn-outline:disabled {
-      color: var(--gray-400);
-      border-color: var(--gray-200);
-      cursor: not-allowed;
-    }
+    /* Brand */
+    .brand { display: flex; align-items: center; gap: 24px; }
+    .brand__logo { width: 128px; height: 128px; object-fit: contain; background: var(--paper); padding: 8px; border: 2px solid var(--ink); }
+    .brand__title { margin: 0; font-size: 2rem; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+    .brand__title-dot { color: rgba(255,255,255,.6); }
 
-    .gs-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 2px dashed var(--gray-200);
-    }
-    .gs-row .label-inline {
-      color: var(--gray-600);
-      font-size: .75rem;
-      letter-spacing: .04em;
-      margin-right: 8px;
-      text-transform: uppercase;
-    }
-    .gs-row .spacer { flex: 1; }
-    .gs-row select,
-    .gs-row select option {
-      /* nota: Windows tende a renderizzare le option con il font di sistema
-         a prescindere; mettiamo uno stack ricco così se Geist Mono non viene
-         applicato i caratteri estesi (ñ, ó, à, ...) escono comunque */
-      font-family: "Geist Mono", "Segoe UI", -apple-system, BlinkMacSystemFont, Inter, ui-monospace, monospace;
-    }
-    .gs-row select {
-      padding: 8px 16px;
-      font-size: .8rem;
-      border: var(--border-w) solid var(--gray-900);
-      border-radius: var(--radius);
-      background: var(--white);
-      color: var(--gray-900);
-      max-width: 100%;
-      cursor: pointer;
-      transition: box-shadow .2s var(--ease);
-    }
-    .gs-row select:hover:not(:disabled) { box-shadow: 2px 2px 0 var(--maroon); }
-    .gs-row select:disabled {
-      background: var(--gray-50);
-      color: var(--gray-400);
-      cursor: not-allowed;
-      border-color: var(--gray-200);
-    }
+    /* Eyebrow: stesso stile in tutti i pannelli, cambia solo il colore. */
+    .eyebrow { margin: 0 0 8px; font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .16em; color: rgba(26, 26, 30, .42); }
+    .eyebrow--light { color: rgba(255,255,255,.7); line-height: 1.4; }
 
-    /* ===== meta ===== */
-    .meta-grid {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 16px 24px;
-      align-items: center;
-    }
-    .badges { display: flex; gap: 8px; flex-wrap: wrap; }
-    .badge {
-      display: inline-block;
-      padding: 8px 16px;
-      background: var(--maroon);
-      color: var(--white);
-      border: var(--border-w) solid var(--gray-900);
-      border-radius: var(--radius);
-      font-size: .68rem;
-      font-weight: 600;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-    }
-    .badge.neutral {
-      background: var(--white);
-      color: var(--gray-900);
-    }
-    .meta {
-      font-size: .8rem;
-      color: var(--gray-600);
-      word-break: break-all;
-      min-width: 0;
-    }
-    .meta strong {
-      color: var(--gray-900);
-      font-weight: 700;
-      margin-right: 8px;
-      text-transform: uppercase;
-      font-size: .7rem;
-      letter-spacing: .08em;
-    }
-    .meta-stack { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .search { display: flex; gap: 8px; }
+    .search__input { flex: 1; min-width: 0; padding: 16px; font: inherit; font-size: .85rem; border: 2px solid var(--ink); border-radius: 4px; }
+    .search__input:focus { outline: 2px solid var(--maroon); outline-offset: 2px; }
 
-    /* ===== html collapsible ===== */
-    .html-toggle {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      cursor: pointer;
-      list-style: none;
-      font-weight: 600;
-      font-size: .82rem;
-      color: var(--gray-900);
-      text-transform: uppercase;
-      letter-spacing: .04em;
-    }
+    .btn { font: inherit; font-weight: 600; cursor: pointer; text-transform: uppercase; letter-spacing: .04em; border-radius: 4px; transition: background .15s, color .15s; }
+    .btn--primary { padding: 16px 32px; font-size: .85rem; background: var(--maroon); color: var(--paper); border: 2px solid var(--ink); }
+    .btn--primary:hover { background: #6b1e29; }
+    .btn--outline { padding: 8px 16px; font-size: .75rem; background: var(--paper); color: var(--maroon); border: 2px solid var(--maroon); }
+    .btn--outline:hover:not(:disabled) { background: var(--maroon); color: var(--paper); }
+    .btn--outline:disabled { color: rgba(26, 26, 30, .42); border-color: rgba(26, 26, 30, .15); cursor: not-allowed; }
+
+    /* selettore gs */
+    .gs-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 2px solid rgba(26, 26, 30, .15); }
+    .gs-picker__hint { width: 100%; color: rgba(26, 26, 30, .68); font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+    /*  serve fallback per caratteri estesi (ñ, à, é) se Geist non si applica. */
+    .gs-picker__select { flex: 1 1 0; min-width: 0; font: .8rem "Geist Mono", "Segoe UI", -apple-system, monospace; padding: 8px 16px; cursor: pointer; border: 2px solid var(--ink); border-radius: 4px; background: var(--paper); }
+    .gs-picker__select:disabled { background: rgba(26, 26, 30, .03); color: rgba(26, 26, 30, .42); border-color: rgba(26, 26, 30, .15); cursor: not-allowed; }
+
+    /* Header risultato, si può rimuovere "altre metriche" (Mazz) */
+    .meta { display: grid; grid-template-columns: auto 1fr; gap: 16px 24px; align-items: center; }
+    .meta__badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .meta__badge { padding: 8px 16px; background: var(--maroon); color: var(--paper); border: 2px solid var(--ink); border-radius: 4px; font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+    .meta__list { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .meta__row { font-size: .8rem; color: rgba(26, 26, 30, .68); word-break: break-all; }
+    .meta__row b { margin-right: 8px; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink); }
+
+    /* html grezzo ù*/
+    .html-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-size: .82rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
     .html-toggle::-webkit-details-marker { display: none; }
-    .html-toggle::before {
-      content: "▸";
-      color: var(--maroon);
-      font-size: .75rem;
-      transition: transform .2s var(--ease);
-    }
-    details[open] > .html-toggle::before { transform: rotate(90deg); }
-    .html-toggle .hint {
-      color: var(--gray-400);
-      font-weight: 400;
-      font-size: .72rem;
-      margin-left: auto;
-      text-transform: none;
-      letter-spacing: 0;
-    }
-    .html-pre {
-      margin: 16px 0 0;
-      border: var(--border-w) solid var(--gray-900);
-      border-radius: var(--radius);
-      padding: 16px;
-      max-height: 320px;
-      overflow: auto;
-      background: var(--gray-50);
-      font-size: .72rem;
-      font-family: inherit;
-      white-space: pre-wrap;
-      word-break: break-word;
-      color: var(--gray-600);
-    }
+    .html-toggle::before { content: "+"; color: var(--maroon); width: 12px; }
+    details[open] > .html-toggle::before { content: "−"; }
+    .html-toggle__hint { margin-left: auto; color: rgba(26, 26, 30, .42); font-weight: 400; font-size: .72rem; text-transform: none; letter-spacing: 0; }
+    .html-pre { margin: 16px 0 0; padding: 16px; max-height: 320px; overflow: auto; border: 2px solid var(--ink); border-radius: 4px; background: rgba(26, 26, 30, .03); font: .72rem/1.5 inherit; color: rgba(26, 26, 30, .68); white-space: pre-wrap; word-break: break-word; }
 
-    /* ===== text card body ===== */
-    .text-head {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding-bottom: 16px;
-      border-bottom: var(--border-w) solid var(--gray-900);
-      margin-bottom: 16px;
-    }
-    .text-head h3 {
-      margin: 0;
-      font-size: .82rem;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--gray-900);
-    }
-    .text-head .kind {
-      margin-left: auto;
-      color: var(--gray-400);
-      font-size: .68rem;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-    }
-    .text-body {
-      max-height: 480px;
-      overflow-y: auto;
-      overflow-x: hidden;
-      font-size: .85rem;
-      line-height: 1.6;
-      white-space: pre-wrap;
-      word-break: break-word;
-      color: var(--gray-900);
-    }
+    /* header */
+    .panel-head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 2px solid var(--ink); }
+    .panel-head h3 { margin: 0; font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    .panel-head__tag { margin-left: auto; color: rgba(26, 26, 30, .42); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
 
-    /* ===== metric cards: donut circolari ===== */
-    .m-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
-      border-bottom: var(--border-w) solid var(--gray-900);
-    }
-    .m-head h3 {
-      margin: 0;
-      font-size: .82rem;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--gray-900);
-    }
-    .m-head .m-tag {
-      font-size: .65rem;
-      color: var(--gray-400);
-      letter-spacing: .12em;
-      text-transform: uppercase;
-    }
+    .text-body { max-height: 480px; overflow: auto; font-size: .85rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
 
-    .donut-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      justify-items: center;
-    }
-    .donut-row.solo { grid-template-columns: 1fr; }
 
-    /* il donut: SVG con circle stroke-dashoffset.
-       il riempimento è scalato sul valore [0,1] della metrica */
-    .donut {
-      position: relative;
-      width: 96px;
-      height: 96px;
-      flex-shrink: 0;
-    }
-    .donut svg {
-      width: 100%;
-      height: 100%;
-      transform: rotate(-90deg);
-    }
-    .donut .track {
-      fill: none;
-      stroke: var(--gray-100);
-      stroke-width: 10;
-    }
-    .donut .arc {
-      fill: none;
-      stroke: var(--maroon);
-      stroke-width: 10;
-      stroke-linecap: butt;
-      transition: stroke-dashoffset .6s var(--ease);
-    }
-    .donut .center {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 2px;
-    }
-    .donut .val {
-      font-size: 1.05rem;
-      font-weight: 700;
-      font-variant-numeric: tabular-nums;
-      color: var(--gray-900);
-      letter-spacing: -.02em;
-    }
-    .donut .lbl {
-      font-size: .58rem;
-      color: var(--gray-600);
-      text-transform: uppercase;
-      letter-spacing: .12em;
-    }
+    .metric-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; }
+    .metric { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: baseline; }
+    .metric__label { font-size: .72rem; color: rgba(26, 26, 30, .68); text-transform: uppercase; letter-spacing: .08em; }
+    .metric__label small { display: block; margin-top: 2px; font-size: .62rem; color: rgba(26, 26, 30, .42); text-transform: none; letter-spacing: 0; }
+    .metric__value { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .metric__bar { grid-column: 1 / -1; height: 6px; background: rgba(26, 26, 30, .06); overflow: hidden; }
+    .metric__bar > span { display: block; height: 100%; background: var(--maroon); }
+    /* per barra a ciambella
+    .metric--ring { width: 96px; height: 96px; position: relative; }
+    .metric--ring svg {transform: rotate(-90deg); }
+    .metric--ring .arc { fill: none; stroke: var(--maroon); stroke-width: 10;}
+    */
 
-    .m-extra {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      justify-items: center;
-      align-items: start;
-    }
-    /* sub-label dentro il donut: testo piccolo sotto la label principale,
-       senza sovrapporsi al bordo del cerchio. la usiamo in altre-metriche dove
-       i due donut sono più grandi (120px) e c'è spazio interno sufficiente */
-    .donut .lbl-sub {
-      font-size: .54rem;
-      color: var(--gray-400);
-      text-transform: none;
-      letter-spacing: .01em;
-      margin-top: 2px;
-      max-width: 92px;
-      text-align: center;
-      line-height: 1.15;
-    }
-    .m-extra .donut {
-      width: 144px;
-      height: 144px;
-    }
-    .m-extra .donut .val { font-size: 1.25rem; }
-    .m-extra .donut .lbl { font-size: .66rem; }
-    .m-extra .donut .lbl-sub { font-size: .58rem; max-width: 104px; }
-
-    /* ===== footer ===== */
-    footer.foot {
-      margin-top: 32px;
-      padding-top: 16px;
-      border-top: var(--border-w) solid var(--gray-900);
-      color: var(--gray-600);
-      font-size: .72rem;
-      text-align: center;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-    }
-    footer.foot .names { color: var(--gray-900); font-weight: 700; }
+    .credits { margin-top: 32px; padding-top: 16px; border-top: 2px solid var(--ink); font-size: .72rem; text-align: center; letter-spacing: .12em; text-transform: uppercase; color: rgba(26, 26, 30, .68); }
+    .credits b { color: var(--ink); font-weight: 700; }
   </style>
 </head>
 <body>
-  <div class="wrap">
 
-    <div class="bento">
+{# metrica = label + valore + barra #}
+{% macro metric(lbl, v, sub='') %}
+<li class="metric">
+  <span class="metric__label">{{ lbl }}{% if sub %}<small>{{ sub }}</small>{% endif %}</span>
+  <span class="metric__value">{{ "%.3f"|format(v) }}</span>
+  <div class="metric__bar"><span style="width: {{ (v * 100)|round(1) }}%"></span></div>
+</li>
+{% endmacro %}
 
-      <!-- BRAND -->
-      <section class="cell cell--brand is-hoverable is-accent">
-        <div class="brand-top">
-          <img src="/static/minerva.png" alt="Minerva NLP" class="brand-logo">
-          <div>
-            <p class="eyebrow" style="color: rgba(255,255,255,.7); line-height: 1.4;">Laboratorio<br>ingegneria informatica<br>2026</p>
-            <h1>Minerva Parser<span class="dot">.</span></h1>
-          </div>
-        </div>
-      </section>
+<div class="wrap">
+<div class="layout">
 
-      <!-- SEARCH -->
-      <section class="cell cell--search is-hoverable">
-        <p class="eyebrow">Input</p>
-        <form class="search-row" method="get" action="/">
-          <input type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
-          <button class="btn btn-primary" type="submit">Parse</button>
-        </form>
-
-        {% if domains %}
-        <div class="gs-row">
-          <span class="label-inline">oppure dal gold standard</span>
-          <select id="gs-domain">
-            <option value="">— dominio —</option>
-            {% for d in domains %}
-            <option value="{{ d }}">{{ d }}</option>
-            {% endfor %}
-          </select>
-          <select id="gs-url" disabled>
-            <option value="">— url —</option>
-          </select>
-          <span class="spacer"></span>
-          <button class="btn btn-outline" type="button" id="gs-go" disabled>Parse dal GS</button>
-        </div>
-        <script>
-          const fullGs = {{ full_gs | tojson }};
-          const selDomain = document.getElementById("gs-domain");
-          const selUrl = document.getElementById("gs-url");
-          const btnGo = document.getElementById("gs-go");
-
-          selDomain.addEventListener("change", () => {
-            selUrl.innerHTML = '<option value="">— url —</option>';
-            const entries = fullGs[selDomain.value] || [];
-            for (const e of entries) {
-              const opt = document.createElement("option");
-              opt.value = e.url;
-              opt.textContent = e.title || e.url;
-              selUrl.appendChild(opt);
-            }
-            selUrl.disabled = entries.length === 0;
-            btnGo.disabled = true;
-          });
-          selUrl.addEventListener("change", () => { btnGo.disabled = !selUrl.value; });
-          btnGo.addEventListener("click", () => {
-            if (selUrl.value) window.location.href = "/?url=" + encodeURIComponent(selUrl.value);
-          });
-        </script>
-        {% else %}
-        <div class="gs-row">
-          <span class="label-inline">backend non raggiungibile: nessun dominio disponibile.</span>
-        </div>
-        {% endif %}
-      </section>
-
-      {% if error %}
-      <section class="cell cell--error">
-        <strong>Errore:</strong> {{ error }}
-      </section>
-      {% endif %}
-
-      {% if parse_result %}
-      <!-- META -->
-      <section class="cell cell--meta is-hoverable">
-        <div class="meta-grid">
-          <div class="badges">
-            <span class="badge">{{ parse_result.domain }}</span>
-            {% if gs_entry %}<span class="badge neutral">nel gold standard</span>{% endif %}
-          </div>
-          <div class="meta-stack">
-            <div class="meta"><strong>URL</strong>{{ parse_result.url }}</div>
-            <div class="meta"><strong>Titolo</strong>{{ parse_result.title }}</div>
-          </div>
-        </div>
-      </section>
-
-      <!-- HTML COLLAPSIBLE -->
-      <section class="cell cell--html is-hoverable">
-        <details>
-          <summary class="html-toggle">html text <span class="hint">clicca per espandere</span></summary>
-          <pre class="html-pre">{{ parse_result.html_text }}</pre>
-        </details>
-      </section>
-
-      <!-- PARSED + GOLD -->
-      <section class="cell cell--parsed is-hoverable {% if not gs_entry %}is-full{% endif %}">
-        <div class="text-head">
-          <h3>parsed text</h3>
-          <span class="kind">markdown</span>
-        </div>
-        <div class="text-body">{{ parse_result.parsed_text }}</div>
-      </section>
-
-      {% if gs_entry %}
-      <section class="cell cell--gold is-hoverable">
-        <div class="text-head">
-          <h3>gold text</h3>
-          <span class="kind">plain</span>
-        </div>
-        <div class="text-body">{{ gs_entry.gold_text }}</div>
-      </section>
-      {% endif %}
-
-      {% if evaluation %}
-      <!-- METRICHE: donut circolari, valori decimali -->
-      <section class="cell cell--m-token is-hoverable">
-        <div class="m-head">
-          <h3>token-level</h3>
-          <span class="m-tag">P · R · F1</span>
-        </div>
-        <div class="donut-row">
-          {% set p = evaluation.token_level_eval.precision %}
-          {% set r = evaluation.token_level_eval.recall %}
-          {% set f = evaluation.token_level_eval.f1 %}
-          <div class="donut">
-            <svg viewBox="0 0 100 100">
-              <circle class="track" cx="50" cy="50" r="42"></circle>
-              <circle class="arc" cx="50" cy="50" r="42"
-                stroke-dasharray="263.89"
-                stroke-dashoffset="{{ (263.89 * (1 - p))|round(2) }}"></circle>
-            </svg>
-            <div class="center">
-              <span class="val">{{ "%.3f"|format(p) }}</span>
-              <span class="lbl">precision</span>
-            </div>
-          </div>
-          <div class="donut">
-            <svg viewBox="0 0 100 100">
-              <circle class="track" cx="50" cy="50" r="42"></circle>
-              <circle class="arc" cx="50" cy="50" r="42"
-                stroke-dasharray="263.89"
-                stroke-dashoffset="{{ (263.89 * (1 - r))|round(2) }}"></circle>
-            </svg>
-            <div class="center">
-              <span class="val">{{ "%.3f"|format(r) }}</span>
-              <span class="lbl">recall</span>
-            </div>
-          </div>
-          <div class="donut">
-            <svg viewBox="0 0 100 100">
-              <circle class="track" cx="50" cy="50" r="42"></circle>
-              <circle class="arc" cx="50" cy="50" r="42"
-                stroke-dasharray="263.89"
-                stroke-dashoffset="{{ (263.89 * (1 - f))|round(2) }}"></circle>
-            </svg>
-            <div class="center">
-              <span class="val">{{ "%.3f"|format(f) }}</span>
-              <span class="lbl">f1</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {% if evaluation.x_eval.rouge_1 %}
-      <section class="cell cell--m-rouge is-hoverable">
-        <div class="m-head">
-          <h3>rouge-1</h3>
-          <span class="m-tag">P · R · F1</span>
-        </div>
-        <div class="donut-row">
-          {% set rp = evaluation.x_eval.rouge_1.precision %}
-          {% set rr = evaluation.x_eval.rouge_1.recall %}
-          {% set rf = evaluation.x_eval.rouge_1.f1 %}
-          <div class="donut">
-            <svg viewBox="0 0 100 100">
-              <circle class="track" cx="50" cy="50" r="42"></circle>
-              <circle class="arc" cx="50" cy="50" r="42"
-                stroke-dasharray="263.89"
-                stroke-dashoffset="{{ (263.89 * (1 - rp))|round(2) }}"></circle>
-            </svg>
-            <div class="center">
-              <span class="val">{{ "%.3f"|format(rp) }}</span>
-              <span class="lbl">precision</span>
-            </div>
-          </div>
-          <div class="donut">
-            <svg viewBox="0 0 100 100">
-              <circle class="track" cx="50" cy="50" r="42"></circle>
-              <circle class="arc" cx="50" cy="50" r="42"
-                stroke-dasharray="263.89"
-                stroke-dashoffset="{{ (263.89 * (1 - rr))|round(2) }}"></circle>
-            </svg>
-            <div class="center">
-              <span class="val">{{ "%.3f"|format(rr) }}</span>
-              <span class="lbl">recall</span>
-            </div>
-          </div>
-          <div class="donut">
-            <svg viewBox="0 0 100 100">
-              <circle class="track" cx="50" cy="50" r="42"></circle>
-              <circle class="arc" cx="50" cy="50" r="42"
-                stroke-dasharray="263.89"
-                stroke-dashoffset="{{ (263.89 * (1 - rf))|round(2) }}"></circle>
-            </svg>
-            <div class="center">
-              <span class="val">{{ "%.3f"|format(rf) }}</span>
-              <span class="lbl">f1</span>
-            </div>
-          </div>
-        </div>
-      </section>
-      {% endif %}
-
-      <section class="cell cell--m-extra is-hoverable">
-        <div class="m-head">
-          <h3>altre metriche</h3>
-        </div>
-        <div class="m-extra">
-          {% if evaluation.x_eval.chrf is defined %}
-          {% set cv = evaluation.x_eval.chrf %}
-          <div class="donut">
-            <svg viewBox="0 0 100 100">
-              <circle class="track" cx="50" cy="50" r="42"></circle>
-              <circle class="arc" cx="50" cy="50" r="42"
-                stroke-dasharray="263.89"
-                stroke-dashoffset="{{ (263.89 * (1 - cv))|round(2) }}"></circle>
-            </svg>
-            <div class="center">
-              <span class="val">{{ "%.3f"|format(cv) }}</span>
-              <span class="lbl">chrF</span>
-              <span class="lbl-sub">(sovrapposizione caratteri)</span>
-            </div>
-          </div>
-          {% endif %}
-          {% if evaluation.x_eval.noise_ratio is defined %}
-          {% set nv = evaluation.x_eval.noise_ratio %}
-          <div class="donut">
-            <svg viewBox="0 0 100 100">
-              <circle class="track" cx="50" cy="50" r="42"></circle>
-              <circle class="arc" cx="50" cy="50" r="42"
-                stroke-dasharray="263.89"
-                stroke-dashoffset="{{ (263.89 * (1 - nv))|round(2) }}"></circle>
-            </svg>
-            <div class="center">
-              <span class="val">{{ "%.3f"|format(nv) }}</span>
-              <span class="lbl">noise</span>
-              <span class="lbl-sub">(1 − precision)</span>
-            </div>
-          </div>
-          {% endif %}
-        </div>
-      </section>
-      {% endif %}
-      {% endif %}
-
+  <section class="layout__panel layout__panel--brand">
+    <div class="brand">
+      <img src="/static/minerva.png" alt="Minerva NLP" class="brand__logo">
+      <div>
+        <p class="eyebrow eyebrow--light">Laboratorio<br>ingegneria informatica<br>2026</p>
+        <h1 class="brand__title">Minerva Parser<span class="brand__title-dot">.</span></h1>
+      </div>
     </div>
+  </section>
 
-    <footer class="foot">
-      <span class="names">Cillo · Lobello · Mazzocco</span>
-    </footer>
-  </div>
+  <section class="layout__panel layout__panel--search">
+    <p class="eyebrow">Input</p>
+    <form class="search" method="get" action="/" id="parse-form">
+      <input class="search__input" type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
+      <button class="btn btn--primary" type="submit" id="parse-btn">Parse</button>
+    </form>
+
+    {% if domains %}
+    <div class="gs-picker">
+      <span class="gs-picker__hint">oppure dal gold standard</span>
+      <select class="gs-picker__select" id="gs-domain">
+        <option value="">— dominio —</option>
+        {% for d in domains %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+      </select>
+      <select class="gs-picker__select" id="gs-url" disabled><option value="">— url —</option></select>
+      <button class="btn btn--outline" type="button" id="gs-go" disabled>Parse dal GS</button>
+    </div>
+    <script>
+      // Cascata dominio → URL: il dropdown URL si popola al cambio di dominio.
+      const fullGs = {{ full_gs | tojson }};
+      const dom = document.getElementById("gs-domain");
+      const url = document.getElementById("gs-url");
+      const go  = document.getElementById("gs-go");
+
+      dom.onchange = () => {
+        url.innerHTML = '<option value="">— url —</option>';
+        const entries = fullGs[dom.value] || [];
+        for (const e of entries) {
+          const opt = document.createElement("option");
+          opt.value = e.url;
+          opt.textContent = e.title || e.url;
+          url.appendChild(opt);
+        }
+        url.disabled = entries.length === 0;
+        go.disabled  = true;
+      };
+      url.onchange = () => { go.disabled = !url.value; };
+      go.onclick   = () => { if (url.value) location.href = "/?url=" + encodeURIComponent(url.value); };
+
+      // Disabilito il submit dopo il primo click: il /parse del backend può
+      // impiegare diversi secondi e l'utente tende a ricliccare nel frattempo.
+      document.getElementById("parse-form").addEventListener("submit", () => {
+        document.getElementById("parse-btn").disabled = true;
+      });
+    </script>
+    {% else %}
+    <div class="gs-picker"><span class="gs-picker__hint">backend non raggiungibile: nessun dominio disponibile.</span></div>
+    {% endif %}
+  </section>
+
+  {% if error %}
+  <section class="layout__panel layout__panel--error"><b>Errore:</b> {{ error }}</section>
+  {% endif %}
+
+  {% if parse_result %}
+  <section class="layout__panel layout__panel--meta">
+    <div class="meta">
+      <div class="meta__badges">
+        <span class="meta__badge">{{ parse_result.domain }}</span>
+      </div>
+      <div class="meta__list">
+        <div class="meta__row"><b>URL</b>{{ parse_result.url }}</div>
+        <div class="meta__row"><b>Titolo</b>{{ parse_result.title }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="layout__panel layout__panel--html">
+    <details>
+      <summary class="html-toggle">html text <span class="html-toggle__hint">clicca per espandere</span></summary>
+      <pre class="html-pre">{{ parse_result.html_text }}</pre>
+    </details>
+  </section>
+
+  <section class="layout__panel layout__panel--parsed{% if not gs_entry %} is-full{% endif %}">
+    <div class="panel-head"><h3>parsed text</h3></div>
+    <div class="text-body">{{ parse_result.parsed_text }}</div>
+  </section>
+
+  {% if gs_entry %}
+  <section class="layout__panel layout__panel--gold">
+    <div class="panel-head"><h3>gold text</h3></div>
+    <div class="text-body">{{ gs_entry.gold_text }}</div>
+  </section>
+  {% endif %}
+
+  {% if evaluation %}
+  {% set tk = evaluation.token_level_eval %}
+  <section class="layout__panel layout__panel--metric">
+    <div class="panel-head"><h3>token-level</h3></div>
+    <ul class="metric-list">
+      {{ metric('precision', tk.precision) }}
+      {{ metric('recall',    tk.recall) }}
+      {{ metric('f1',        tk.f1) }}
+    </ul>
+  </section>
+
+  {% if evaluation.x_eval.rouge_1 %}
+  {% set r1 = evaluation.x_eval.rouge_1 %}
+  <section class="layout__panel layout__panel--metric is-rouge">
+    <div class="panel-head"><h3>rouge-1</h3></div>
+    <ul class="metric-list">
+      {{ metric('precision', r1.precision) }}
+      {{ metric('recall',    r1.recall) }}
+      {{ metric('f1',        r1.f1) }}
+    </ul>
+  </section>
+  {% endif %}
+
+  <section class="layout__panel layout__panel--metric is-extra">
+    <ul class="metric-list">
+      {% if evaluation.x_eval.chrf is defined %}
+        {{ metric('chrF', evaluation.x_eval.chrf, 'sovrapposizione caratteri') }}
+      {% endif %}
+      {% if evaluation.x_eval.noise_ratio is defined %}
+        {{ metric('noise', evaluation.x_eval.noise_ratio, '1 − precision') }}
+      {% endif %}
+    </ul>
+  </section>
+  {% endif %}
+  {% endif %}
+
+</div>
+<footer class="credits"><b>Cillo · Lobello · Mazzocco</b></footer>
+</div>
 </body>
 </html>
