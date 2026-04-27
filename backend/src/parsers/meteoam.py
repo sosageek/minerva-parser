@@ -7,14 +7,13 @@ from ..utils.cleaning import remove_markup, normalize_whitespace
 
 
 class MeteoAmParser(Parser):
-    """Parser per le pagine di meteoam.it
+    """Parser per pagine di meteoam
 
     * isola il contenuto
-    * scarta header articolo, side col, gallerie immagini, moduli potrebbe piacerti anche / articoli recenti
-
-    excluded selectors  passati direttamente a crawl4ai senza beautiful soup 
+    * scarta header articolo, side col, gallerie immagini, moduli potrebbe piacerti anche / articoli recenti 
     """
 
+# ---------------------------------- SELETTORI ----------------------------------
 
     _EXCLUDED_SELECTORS = (
         "a.news-details-header-go-back, "
@@ -31,6 +30,7 @@ class MeteoAmParser(Parser):
     )
     _TARGET_ELEMENTS = ["section#details_news_page"]
 
+# ---------------------------------- REGEX ----------------------------------
 
     #se articoli correlati e photo gallery resistono alla rimozione da excluded selectors
     _RE_RELATED = re.compile(
@@ -72,6 +72,7 @@ class MeteoAmParser(Parser):
             target_elements=self._TARGET_ELEMENTS
         )
 
+# ---------------------------------- METODI PUBBLICI -------------------------------
 
     async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
         """Applica la pipeline di parsing
@@ -119,7 +120,7 @@ class MeteoAmParser(Parser):
         """
 
         # crawl4ai a volte mette nbsp (\xa0) che NON viene matchato da \s in alcune
-        # combinazioni regex: pre-normalizziamo a spazio ascii per sicurezza (Mazz)
+        # combinazioni regex: formatta a spazio ascii per sicurezza (Mazz)
         text = text.replace('\xa0', ' ')
         text = self._RE_BACK_LINK.sub('', text)
         text = self._RE_RELATED.sub('', text)
@@ -137,7 +138,7 @@ class MeteoAmParser(Parser):
 
 
     def _fallback_config(self) -> CrawlerRunConfig:
-        """Config alternativa per pagine meteoam.it senza section#details_news_page
+        """Config alternativa per pagine meteoam senza section#details_news_page
 
         nota: stessi excluded selectors e stessi excluded tags della config principale,
         ma target_elements vuoto così crawl4ai estrae tutto il body al netto di nav/aside

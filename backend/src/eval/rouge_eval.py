@@ -4,7 +4,16 @@ from .eval import Evaluator
 
 
 class RougeOneEvaluator(Evaluator):
-    #multiset tiene conto delle ripetizioni
+    """
+    Classe per valutare ROUGE-1: sovrapposizione di unigrammi con precision, recall, F1.
+    
+    Attributes:
+        _WORD_RE: Regex per tokenizzare parole.
+    
+    Methods:
+        evaluate(parsed_text, gold_text): Ritorna dict con precision, recall, f1.
+        _tokenize(text): Lista di parole minuscole.
+    """
     _WORD_RE = re.compile(r"\w+", re.UNICODE) # si può mettere in .eval più tardi
 
     def evaluate(self, parsed_text: str, gold_text: str) -> dict:
