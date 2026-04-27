@@ -54,15 +54,16 @@ class Parser(ABC):
         )
 
 
-    async def _fetch(self, url: str, raw_html: str | None = None):
+    async def _fetch(self, url: str, raw_html: str | None = None, config: CrawlerRunConfig | None = None):
         """Acquisisce una pagina usando il crawler condiviso
 
-        se ``raw_html`` è fornito non viene effettuata nessuna richiesta di rete, 
+        se ``raw_html`` è fornito non viene effettuata nessuna richiesta di rete,
         crawl4ai processa direttamente l'HTML passato
 
         Args:
             url(str): URL assoluto della pagina (usato per logging e messaggi d'errore)
             raw_html(str): HTML già scaricato lato client
+            config(CrawlerRunConfig): override della config; se None usa ``self.crawler_config``
 
         Returns:
             un ``CrawlResult`` di crawl4ai con ``success=True``
@@ -73,11 +74,14 @@ class Parser(ABC):
 
         crawler = await get_crawler()
         fetch_target = f"raw:{raw_html}" if raw_html is not None else url
-        result = await crawler.arun(url=fetch_target, config=self.crawler_config)
-        if not result.success:
+        result = await crawler.arun(url=fetch_target, config=config or self.crawler_config)
+        # nota: con raw_html non c'è fetch di rete, lo status code è None / 200 fittizio.
+        # Lo controlliamo solo quando abbiamo davvero scaricato una pagina (gabriele)
+        status = getattr(result, "status_code", None)
+        if not result.success or (raw_html is None and status is not None and status >= 400):
             raise CrawlError(
                 url=url,
-                status_code=getattr(result, "status_code", None),
+                status_code=status,
                 error_message=getattr(result, "error_message", None),
             )
         return result

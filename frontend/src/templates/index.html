@@ -4,506 +4,282 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Minerva Parser</title>
-  <link rel="icon" type="image/webp" href="/static/minerva.webp">
+  <link rel="icon" type="image/png" href="/static/minerva.png">
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;600;700&display=swap&subset=latin,latin-ext" rel="stylesheet">
   <style>
-    /* palette a 3 colori: maroon minerva, bianco, grigio neutro */
     :root {
-      --maroon: #862633;
-      --maroon-soft: #f4e5e8;
-      --white: #ffffff;
-      --gray-50: #f6f6f7;
-      --gray-100: #ececee;
-      --gray-200: #d9d9dd;
-      --gray-400: #8a8a92;
-      --gray-600: #55555c;
-      --gray-900: #1a1a1e;
-      --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.06);
+      --maroon: #862633;   /* di minerva nlp */
+      --ink: #1a1a1e;
+      --paper: #fff;
     }
-
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
-      background: var(--gray-50);
-      color: var(--gray-900);
-      line-height: 1.5;
-      font-size: 15px;
-    }
-    a { color: var(--maroon); }
-
-    .container { max-width: 1120px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
-
-    header.hero {
-      margin-bottom: 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: .9rem;
-    }
-    header.hero img.logo {
-      width: 48px;
-      height: 48px;
-      border-radius: 8px;
-      background: var(--maroon);
-    }
-    header.hero h1 {
-      font-size: 1.7rem;
       margin: 0;
-      letter-spacing: -0.01em;
+      font: 14px/1.5 "Geist Mono", ui-monospace, Menlo, Consolas, monospace;
+      background: rgba(26, 26, 30, .03);
+      color: var(--ink);
     }
-    header.hero h1 .dot { color: var(--maroon); }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 32px 24px 64px; }
 
-    /* card generica */
-    .card {
-      background: var(--white);
-      border: 1px solid var(--gray-100);
-      border-radius: 10px;
-      box-shadow: var(--shadow);
-    }
-
-    /* search */
-    .search { padding: 1.1rem 1.1rem 1rem; margin-bottom: 1rem; }
-    .search form { display: flex; gap: .5rem; }
-    .search input[type=text] {
-      flex: 1;
-      padding: .6rem .8rem;
-      font-size: .95rem;
-      border: 1px solid var(--gray-200);
-      border-radius: 6px;
-      background: var(--white);
-      color: var(--gray-900);
-    }
-    .search input[type=text]:focus {
-      outline: 2px solid var(--maroon);
-      outline-offset: -1px;
-      border-color: var(--maroon);
-    }
-    .btn-primary {
-      padding: .6rem 1.3rem;
-      font-size: .95rem;
-      font-weight: 600;
-      background: var(--maroon);
-      color: var(--white);
-      border: 0;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    .btn-primary:hover { filter: brightness(1.08); }
-    .btn-outline {
-      padding: .45rem 1rem;
-      font-size: .88rem;
-      background: var(--white);
-      color: var(--maroon);
-      border: 1px solid var(--maroon);
-      border-radius: 6px;
-      cursor: pointer;
-      font-weight: 500;
-    }
-    .btn-outline:disabled {
-      color: var(--gray-400);
-      border-color: var(--gray-200);
-      cursor: not-allowed;
-    }
-    .btn-outline:not(:disabled):hover { background: var(--maroon-soft); }
-
-    .gs-row {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: .5rem;
-      margin-top: .9rem;
-      padding-top: .9rem;
-      border-top: 1px dashed var(--gray-100);
-    }
-    .gs-row .label-inline { color: var(--gray-600); font-size: .88rem; margin-right: .25rem; }
-    .gs-row .spacer { flex: 1; }
-    .gs-row select {
-      padding: .45rem .6rem;
-      font-size: .88rem;
-      border: 1px solid var(--gray-200);
-      border-radius: 6px;
-      background: var(--white);
-      color: var(--gray-900);
-      max-width: 100%;
-    }
-    .gs-row select:disabled { background: var(--gray-50); color: var(--gray-400); }
-
-    /* error banner */
-    .error {
-      margin: 1rem 0;
-      padding: .75rem 1rem;
-      background: var(--maroon-soft);
-      border: 1px solid #e5c4ca;
-      color: var(--maroon);
-      border-radius: 8px;
-      font-size: .92rem;
-    }
-
-    /* meta header del risultato */
-    .result-head {
-      margin: 1.5rem 0 .75rem;
-      display: flex;
-      align-items: baseline;
-      flex-wrap: wrap;
-      gap: .6rem;
-    }
-    .result-head h2 { margin: 0; font-size: 1.15rem; }
-    .badge {
-      display: inline-block;
-      padding: .12rem .55rem;
-      background: var(--maroon-soft);
-      color: var(--maroon);
-      border-radius: 999px;
-      font-size: .78rem;
-      font-weight: 600;
-      letter-spacing: .02em;
-    }
-    .badge.neutral {
-      background: var(--gray-100);
-      color: var(--gray-600);
-    }
-    .meta-line { margin: .25rem 0; color: var(--gray-600); font-size: .88rem; word-break: break-all; }
-    .meta-line strong { color: var(--gray-900); font-weight: 600; margin-right: .3rem; }
-
-    /* collapsible html */
-    details.html-box { margin: 1rem 0; }
-    details.html-box > summary {
-      list-style: none;
-      cursor: pointer;
-      padding: .6rem .85rem;
-      background: var(--white);
-      border: 1px solid var(--gray-100);
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: .9rem;
-      color: var(--gray-900);
-      display: flex;
-      align-items: center;
-      gap: .5rem;
-    }
-    details.html-box > summary::-webkit-details-marker { display: none; }
-    details.html-box > summary::before {
-      content: "▸";
-      color: var(--gray-400);
-      font-size: .75rem;
-      transition: transform .15s;
-    }
-    details.html-box[open] > summary::before { transform: rotate(90deg); }
-    details.html-box > summary .hint {
-      color: var(--gray-400);
-      font-weight: 400;
-      font-size: .78rem;
-      margin-left: auto;
-    }
-    details.html-box[open] > summary { border-bottom-left-radius: 0; border-bottom-right-radius: 0; border-bottom: 0; }
-    details.html-box .html-pre {
-      margin: 0;
-      border: 1px solid var(--gray-100);
-      border-top: 0;
-      border-radius: 0 0 8px 8px;
-      padding: .75rem;
-      max-height: 260px;
-      overflow: auto;
-      background: var(--gray-50);
-      font-size: .78rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      white-space: pre-wrap;
-      word-break: break-word;
-      color: var(--gray-600);
-    }
-
-    /* griglia testi */
-    .texts {
+    /* sfalso sui box secondari compensa otticamente il peso del pannello brand a sinistra. */
+    .layout {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: .75rem;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
     }
-    .texts.single { grid-template-columns: 1fr; }
-    .text-card {
-      background: var(--white);
-      border: 1px solid var(--gray-100);
-      border-radius: 8px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-    .text-card .head {
-      padding: .55rem .85rem;
-      background: var(--gray-50);
-      border-bottom: 1px solid var(--gray-100);
-      font-size: .82rem;
-      font-weight: 600;
-      letter-spacing: .02em;
-      color: var(--gray-900);
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: .5rem;
-    }
-    .text-card .head .kind {
-      margin-left: auto;
-      color: var(--gray-400);
-      font-weight: 500;
-      font-size: .72rem;
-      text-transform: none;
-      letter-spacing: 0;
-    }
-    .text-card .body {
-      padding: .85rem 1rem;
-      max-height: 420px;
-      overflow-y: auto;
-      overflow-x: hidden;
-      font-size: .92rem;
-      line-height: 1.55;
-      white-space: pre-wrap;
-      word-break: break-word;
-      color: var(--gray-900);
+    .layout__panel {
+      background: var(--paper);
+      border: 2px solid var(--ink); border-radius: 4px;
+      padding: 24px;
     }
 
-    /* metriche */
-    .metrics { margin-top: 1.5rem; }
-    .metrics h3 {
-      margin: 0 0 .75rem;
-      font-size: 1.05rem;
+    .layout__panel--brand, .layout__panel--search { grid-row: span 2; }
+    .layout__panel--brand {
+      grid-column: span 5;
+      background: var(--maroon); color: var(--paper);
+      display: flex; align-items: center;
+    }
+    .layout__panel--search { grid-column: span 7; margin-top: 24px; }
+    .layout__panel--parsed { grid-column: span 7; }
+    .layout__panel--gold   { grid-column: span 5; margin-top: 24px; }
+    .layout__panel--metric { grid-column: span 4; }
+    .layout__panel--metric.is-rouge { margin-top: 16px; }
+    .layout__panel--metric.is-extra { margin-top: 32px; }
+    .layout__panel--meta,
+    .layout__panel--html,
+    .layout__panel--error,
+    .layout__panel--parsed.is-full { grid-column: span 12; }
+    .layout__panel--html { margin-top: 8px; }
+    .layout__panel--error { background: rgba(134, 38, 51, .12); border-color: #6b1e29; color: #6b1e29; }
+
+    /* mobile tutto in colonna singola */
+    @media (max-width: 960px) {
+      .layout__panel { grid-column: span 12 !important; grid-row: auto !important; margin-top: 0 !important; }
     }
 
-    .metric-group { margin-bottom: 1.25rem; }
-    .metric-group h4 {
-      margin: 0 0 .5rem;
-      font-size: .78rem;
-      text-transform: uppercase;
-      letter-spacing: .08em;
-      color: var(--gray-600);
-    }
-    .metric-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: .6rem;
-    }
-    .metric-grid.wide { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-    .metric {
-      background: var(--white);
-      border: 1px solid var(--gray-100);
-      border-radius: 8px;
-      padding: .75rem .9rem;
-    }
-    .metric .name {
-      font-size: .78rem;
-      color: var(--gray-600);
-      letter-spacing: .02em;
-      display: flex;
-      align-items: baseline;
-      gap: .3rem;
-    }
-    .metric .name .sub { color: var(--gray-400); font-size: .7rem; }
-    .metric .value {
-      font-size: 1.45rem;
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      margin-top: .1rem;
-      color: var(--gray-900);
-    }
-    .metric .bar {
-      height: 4px;
-      margin-top: .55rem;
-      background: var(--gray-100);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .metric .bar > span {
-      display: block;
-      height: 100%;
-      background: var(--maroon);
-      border-radius: 2px;
-    }
+    /* transizione pannelli: traslazione 4px + ombra netta. Riattivare se non da problemi (Mazz)
+    .layout__panel { transition: transform .2s, box-shadow .2s; }
+    .layout__panel:hover { transform: translate(-4px, -4px); box-shadow: 8px 8px 0 var(--ink); }
+    .layout__panel--brand:hover { box-shadow: 8px 8px 0 #6b1e29; }
+    */
 
-    footer.foot {
-      margin-top: 2.5rem;
-      color: var(--gray-400);
-      font-size: .78rem;
-      text-align: center;
-    }
-    footer.foot .names { color: var(--gray-600); font-weight: 500; }
+    /* Brand */
+    .brand { display: flex; align-items: center; gap: 24px; }
+    .brand__logo { width: 128px; height: 128px; object-fit: contain; background: var(--paper); padding: 8px; border: 2px solid var(--ink); }
+    .brand__title { margin: 0; font-size: 2rem; font-weight: 700; letter-spacing: -.02em; line-height: 1; }
+    .brand__title-dot { color: rgba(255,255,255,.6); }
 
-    @media (max-width: 720px) {
-      .texts { grid-template-columns: 1fr; }
-      .metric-grid { grid-template-columns: 1fr 1fr; }
-      .search form { flex-direction: column; }
-      .btn-primary { width: 100%; }
-    }
+    /* Eyebrow: stesso stile in tutti i pannelli, cambia solo il colore. */
+    .eyebrow { margin: 0 0 8px; font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .16em; color: rgba(26, 26, 30, .42); }
+    .eyebrow--light { color: rgba(255,255,255,.7); line-height: 1.4; }
+
+    .search { display: flex; gap: 8px; }
+    .search__input { flex: 1; min-width: 0; padding: 16px; font: inherit; font-size: .85rem; border: 2px solid var(--ink); border-radius: 4px; }
+    .search__input:focus { outline: 2px solid var(--maroon); outline-offset: 2px; }
+
+    .btn { font: inherit; font-weight: 600; cursor: pointer; text-transform: uppercase; letter-spacing: .04em; border-radius: 4px; transition: background .15s, color .15s; }
+    .btn--primary { padding: 16px 32px; font-size: .85rem; background: var(--maroon); color: var(--paper); border: 2px solid var(--ink); }
+    .btn--primary:hover { background: #6b1e29; }
+    .btn--outline { padding: 8px 16px; font-size: .75rem; background: var(--paper); color: var(--maroon); border: 2px solid var(--maroon); }
+    .btn--outline:hover:not(:disabled) { background: var(--maroon); color: var(--paper); }
+    .btn--outline:disabled { color: rgba(26, 26, 30, .42); border-color: rgba(26, 26, 30, .15); cursor: not-allowed; }
+
+    /* selettore gs */
+    .gs-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 2px solid rgba(26, 26, 30, .15); }
+    .gs-picker__hint { width: 100%; color: rgba(26, 26, 30, .68); font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
+    /*  serve fallback per caratteri estesi (ñ, à, é) se Geist non si applica. */
+    .gs-picker__select { flex: 1 1 0; min-width: 0; font: .8rem "Geist Mono", "Segoe UI", -apple-system, monospace; padding: 8px 16px; cursor: pointer; border: 2px solid var(--ink); border-radius: 4px; background: var(--paper); }
+    .gs-picker__select:disabled { background: rgba(26, 26, 30, .03); color: rgba(26, 26, 30, .42); border-color: rgba(26, 26, 30, .15); cursor: not-allowed; }
+
+    /* Header risultato, si può rimuovere "altre metriche" (Mazz) */
+    .meta { display: grid; grid-template-columns: auto 1fr; gap: 16px 24px; align-items: center; }
+    .meta__badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .meta__badge { padding: 8px 16px; background: var(--maroon); color: var(--paper); border: 2px solid var(--ink); border-radius: 4px; font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+    .meta__list { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .meta__row { font-size: .8rem; color: rgba(26, 26, 30, .68); word-break: break-all; }
+    .meta__row b { margin-right: 8px; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink); }
+
+    /* html grezzo ù*/
+    .html-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-size: .82rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .html-toggle::-webkit-details-marker { display: none; }
+    .html-toggle::before { content: "+"; color: var(--maroon); width: 12px; }
+    details[open] > .html-toggle::before { content: "−"; }
+    .html-toggle__hint { margin-left: auto; color: rgba(26, 26, 30, .42); font-weight: 400; font-size: .72rem; text-transform: none; letter-spacing: 0; }
+    .html-pre { margin: 16px 0 0; padding: 16px; max-height: 320px; overflow: auto; border: 2px solid var(--ink); border-radius: 4px; background: rgba(26, 26, 30, .03); font: .72rem/1.5 inherit; color: rgba(26, 26, 30, .68); white-space: pre-wrap; word-break: break-word; }
+
+    /* header */
+    .panel-head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 2px solid var(--ink); }
+    .panel-head h3 { margin: 0; font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+    .panel-head__tag { margin-left: auto; color: rgba(26, 26, 30, .42); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
+
+    .text-body { max-height: 480px; overflow: auto; font-size: .85rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+
+
+    .metric-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px; }
+    .metric { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: baseline; }
+    .metric__label { font-size: .72rem; color: rgba(26, 26, 30, .68); text-transform: uppercase; letter-spacing: .08em; }
+    .metric__label small { display: block; margin-top: 2px; font-size: .62rem; color: rgba(26, 26, 30, .42); text-transform: none; letter-spacing: 0; }
+    .metric__value { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .metric__bar { grid-column: 1 / -1; height: 6px; background: rgba(26, 26, 30, .06); overflow: hidden; }
+    .metric__bar > span { display: block; height: 100%; background: var(--maroon); }
+    /* per barra a ciambella
+    .metric--ring { width: 96px; height: 96px; position: relative; }
+    .metric--ring svg {transform: rotate(-90deg); }
+    .metric--ring .arc { fill: none; stroke: var(--maroon); stroke-width: 10;}
+    */
+
+    .credits { margin-top: 32px; padding-top: 16px; border-top: 2px solid var(--ink); font-size: .72rem; text-align: center; letter-spacing: .12em; text-transform: uppercase; color: rgba(26, 26, 30, .68); }
+    .credits b { color: var(--ink); font-weight: 700; }
   </style>
 </head>
 <body>
-  <div class="container">
 
-    <header class="hero">
-      <img src="/static/minerva.webp" alt="Minerva NLP" class="logo">
-      <h1>Minerva Parser<span class="dot">.</span></h1>
-    </header>
+{# metrica = label + valore + barra #}
+{% macro metric(lbl, v, sub='') %}
+<li class="metric">
+  <span class="metric__label">{{ lbl }}{% if sub %}<small>{{ sub }}</small>{% endif %}</span>
+  <span class="metric__value">{{ "%.3f"|format(v) }}</span>
+  <div class="metric__bar"><span style="width: {{ (v * 100)|round(1) }}%"></span></div>
+</li>
+{% endmacro %}
 
-    <section class="card search">
-      <form method="get" action="/">
-        <input type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
-        <button class="btn-primary" type="submit">Parse</button>
-      </form>
+<div class="wrap">
+<div class="layout">
 
-      {% if domains %}
-      <div class="gs-row">
-        <span class="label-inline">oppure dal gold standard:</span>
-        <select id="gs-domain">
-          <option value="">— dominio —</option>
-          {% for d in domains %}
-          <option value="{{ d }}">{{ d }}</option>
-          {% endfor %}
-        </select>
-        <select id="gs-url" disabled>
-          <option value="">— url —</option>
-        </select>
-        <span class="spacer"></span>
-        <button class="btn-outline" type="button" id="gs-go" disabled>Parse dal GS</button>
+  <section class="layout__panel layout__panel--brand">
+    <div class="brand">
+      <img src="/static/minerva.png" alt="Minerva NLP" class="brand__logo">
+      <div>
+        <p class="eyebrow eyebrow--light">Laboratorio<br>ingegneria informatica<br>2026</p>
+        <h1 class="brand__title">Minerva Parser<span class="brand__title-dot">.</span></h1>
       </div>
-      <script>
-        const fullGs = {{ full_gs | tojson }};
-        const selDomain = document.getElementById("gs-domain");
-        const selUrl = document.getElementById("gs-url");
-        const btnGo = document.getElementById("gs-go");
-
-        selDomain.addEventListener("change", () => {
-          selUrl.innerHTML = '<option value="">— url —</option>';
-          const entries = fullGs[selDomain.value] || [];
-          for (const e of entries) {
-            const opt = document.createElement("option");
-            opt.value = e.url;
-            opt.textContent = e.title || e.url;
-            selUrl.appendChild(opt);
-          }
-          selUrl.disabled = entries.length === 0;
-          btnGo.disabled = true;
-        });
-        selUrl.addEventListener("change", () => { btnGo.disabled = !selUrl.value; });
-        btnGo.addEventListener("click", () => {
-          if (selUrl.value) window.location.href = "/?url=" + encodeURIComponent(selUrl.value);
-        });
-      </script>
-      {% else %}
-      <div class="gs-row">
-        <span class="label-inline">backend non raggiungibile: nessun dominio disponibile.</span>
-      </div>
-      {% endif %}
-    </section>
-
-    {% if error %}
-    <div class="error">{{ error }}</div>
-    {% endif %}
-
-    {% if parse_result %}
-    <div class="result-head">
-      <h2>Risultato</h2>
-      <span class="badge">{{ parse_result.domain }}</span>
-      {% if gs_entry %}<span class="badge neutral">nel gold standard</span>{% endif %}
     </div>
-    <p class="meta-line"><strong>URL</strong>{{ parse_result.url }}</p>
-    <p class="meta-line"><strong>Titolo</strong>{{ parse_result.title }}</p>
+  </section>
 
-    <details class="html-box">
-      <summary>html text <span class="hint">clicca per espandere</span></summary>
+  <section class="layout__panel layout__panel--search">
+    <p class="eyebrow">Input</p>
+    <form class="search" method="get" action="/" id="parse-form">
+      <input class="search__input" type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
+      <button class="btn btn--primary" type="submit" id="parse-btn">Parse</button>
+    </form>
+
+    {% if domains %}
+    <div class="gs-picker">
+      <span class="gs-picker__hint">oppure dal gold standard</span>
+      <select class="gs-picker__select" id="gs-domain">
+        <option value="">— dominio —</option>
+        {% for d in domains %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+      </select>
+      <select class="gs-picker__select" id="gs-url" disabled><option value="">— url —</option></select>
+      <button class="btn btn--outline" type="button" id="gs-go" disabled>Parse dal GS</button>
+    </div>
+    <script>
+      // Cascata dominio → URL: il dropdown URL si popola al cambio di dominio.
+      const fullGs = {{ full_gs | tojson }};
+      const dom = document.getElementById("gs-domain");
+      const url = document.getElementById("gs-url");
+      const go  = document.getElementById("gs-go");
+
+      dom.onchange = () => {
+        url.innerHTML = '<option value="">— url —</option>';
+        const entries = fullGs[dom.value] || [];
+        for (const e of entries) {
+          const opt = document.createElement("option");
+          opt.value = e.url;
+          opt.textContent = e.title || e.url;
+          url.appendChild(opt);
+        }
+        url.disabled = entries.length === 0;
+        go.disabled  = true;
+      };
+      url.onchange = () => { go.disabled = !url.value; };
+      go.onclick   = () => { if (url.value) location.href = "/?url=" + encodeURIComponent(url.value); };
+
+      // Disabilito il submit dopo il primo click: il /parse del backend può
+      // impiegare diversi secondi e l'utente tende a ricliccare nel frattempo.
+      document.getElementById("parse-form").addEventListener("submit", () => {
+        document.getElementById("parse-btn").disabled = true;
+      });
+    </script>
+    {% else %}
+    <div class="gs-picker"><span class="gs-picker__hint">backend non raggiungibile: nessun dominio disponibile.</span></div>
+    {% endif %}
+  </section>
+
+  {% if error %}
+  <section class="layout__panel layout__panel--error"><b>Errore:</b> {{ error }}</section>
+  {% endif %}
+
+  {% if parse_result %}
+  <section class="layout__panel layout__panel--meta">
+    <div class="meta">
+      <div class="meta__badges">
+        <span class="meta__badge">{{ parse_result.domain }}</span>
+      </div>
+      <div class="meta__list">
+        <div class="meta__row"><b>URL</b>{{ parse_result.url }}</div>
+        <div class="meta__row"><b>Titolo</b>{{ parse_result.title }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="layout__panel layout__panel--html">
+    <details>
+      <summary class="html-toggle">html text <span class="html-toggle__hint">clicca per espandere</span></summary>
       <pre class="html-pre">{{ parse_result.html_text }}</pre>
     </details>
+  </section>
 
-    {% if gs_entry %}
-    <div class="texts">
-      <div class="text-card">
-        <div class="head">parsed text <span class="kind">markdown</span></div>
-        <div class="body">{{ parse_result.parsed_text }}</div>
-      </div>
-      <div class="text-card">
-        <div class="head">gold text <span class="kind">plain</span></div>
-        <div class="body">{{ gs_entry.gold_text }}</div>
-      </div>
-    </div>
-    {% else %}
-    <div class="texts single">
-      <div class="text-card">
-        <div class="head">parsed text <span class="kind">markdown</span></div>
-        <div class="body">{{ parse_result.parsed_text }}</div>
-      </div>
-    </div>
-    <p class="meta-line" style="margin-top:.75rem;">URL non nel gold standard: evaluation non disponibile.</p>
-    {% endif %}
+  <section class="layout__panel layout__panel--parsed{% if not gs_entry %} is-full{% endif %}">
+    <div class="panel-head"><h3>parsed text</h3></div>
+    <div class="text-body">{{ parse_result.parsed_text }}</div>
+  </section>
 
-    {% if evaluation %}
-    <section class="metrics">
-      <h3>Evaluation</h3>
+  {% if gs_entry %}
+  <section class="layout__panel layout__panel--gold">
+    <div class="panel-head"><h3>gold text</h3></div>
+    <div class="text-body">{{ gs_entry.gold_text }}</div>
+  </section>
+  {% endif %}
 
-      <div class="metric-group">
-        <h4>token-level</h4>
-        <div class="metric-grid">
-          <div class="metric">
-            <div class="name">precision</div>
-            <div class="value">{{ "%.4f"|format(evaluation.token_level_eval.precision) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.token_level_eval.precision * 100)|round(1) }}%"></span></div>
-          </div>
-          <div class="metric">
-            <div class="name">recall</div>
-            <div class="value">{{ "%.4f"|format(evaluation.token_level_eval.recall) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.token_level_eval.recall * 100)|round(1) }}%"></span></div>
-          </div>
-          <div class="metric">
-            <div class="name">f1</div>
-            <div class="value">{{ "%.4f"|format(evaluation.token_level_eval.f1) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.token_level_eval.f1 * 100)|round(1) }}%"></span></div>
-          </div>
-        </div>
-      </div>
+  {% if evaluation %}
+  {% set tk = evaluation.token_level_eval %}
+  <section class="layout__panel layout__panel--metric">
+    <div class="panel-head"><h3>token-level</h3></div>
+    <ul class="metric-list">
+      {{ metric('precision', tk.precision) }}
+      {{ metric('recall',    tk.recall) }}
+      {{ metric('f1',        tk.f1) }}
+    </ul>
+  </section>
 
-      {% if evaluation.x_eval.rouge_1 %}
-      <div class="metric-group">
-        <h4>rouge-1</h4>
-        <div class="metric-grid">
-          <div class="metric">
-            <div class="name">precision</div>
-            <div class="value">{{ "%.4f"|format(evaluation.x_eval.rouge_1.precision) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.x_eval.rouge_1.precision * 100)|round(1) }}%"></span></div>
-          </div>
-          <div class="metric">
-            <div class="name">recall</div>
-            <div class="value">{{ "%.4f"|format(evaluation.x_eval.rouge_1.recall) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.x_eval.rouge_1.recall * 100)|round(1) }}%"></span></div>
-          </div>
-          <div class="metric">
-            <div class="name">f1</div>
-            <div class="value">{{ "%.4f"|format(evaluation.x_eval.rouge_1.f1) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.x_eval.rouge_1.f1 * 100)|round(1) }}%"></span></div>
-          </div>
-        </div>
-      </div>
+  {% if evaluation.x_eval.rouge_1 %}
+  {% set r1 = evaluation.x_eval.rouge_1 %}
+  <section class="layout__panel layout__panel--metric is-rouge">
+    <div class="panel-head"><h3>rouge-1</h3></div>
+    <ul class="metric-list">
+      {{ metric('precision', r1.precision) }}
+      {{ metric('recall',    r1.recall) }}
+      {{ metric('f1',        r1.f1) }}
+    </ul>
+  </section>
+  {% endif %}
+
+  <section class="layout__panel layout__panel--metric is-extra">
+    <ul class="metric-list">
+      {% if evaluation.x_eval.chrf is defined %}
+        {{ metric('chrF', evaluation.x_eval.chrf, 'sovrapposizione caratteri') }}
       {% endif %}
+      {% if evaluation.x_eval.noise_ratio is defined %}
+        {{ metric('noise', evaluation.x_eval.noise_ratio, '1 − precision') }}
+      {% endif %}
+    </ul>
+  </section>
+  {% endif %}
+  {% endif %}
 
-      <div class="metric-group">
-        <h4>altre metriche</h4>
-        <div class="metric-grid wide">
-          {% if evaluation.x_eval.chrf is defined %}
-          <div class="metric">
-            <div class="name">chrF</div>
-            <div class="value">{{ "%.4f"|format(evaluation.x_eval.chrf) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.x_eval.chrf * 100)|round(1) }}%"></span></div>
-          </div>
-          {% endif %}
-          {% if evaluation.x_eval.noise_ratio is defined %}
-          <div class="metric">
-            <div class="name">noise ratio <span class="sub">1 − precision</span></div>
-            <div class="value">{{ "%.4f"|format(evaluation.x_eval.noise_ratio) }}</div>
-            <div class="bar"><span style="width: {{ (evaluation.x_eval.noise_ratio * 100)|round(1) }}%"></span></div>
-          </div>
-          {% endif %}
-        </div>
-      </div>
-    </section>
-    {% endif %}
-    {% endif %}
-
-    <footer class="foot">
-      <span class="names">Cillo · Lobello · Mazzocco</span>
-    </footer>
-  </div>
+</div>
+<footer class="credits"><b>Cillo · Lobello · Mazzocco</b></footer>
+</div>
 </body>
 </html>
