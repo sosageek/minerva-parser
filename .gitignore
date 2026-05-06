@@ -1,39 +1,20 @@
-# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
 *$py.class
 
-MANIFEST
-
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
-.pdm-python
-.pdm-build/
-
-__pypackages__/
-
 .env
-.envrc
 .venv
 env/
 venv/
-ENV/
-env.bak/
-venv.bak/
-
-# mkdocs documentation
-/site
 
 .vscode/
-
+.idea/
 .DS_Store
+
 output.txt
 test_wiki.py
 test_meteoam.py
 test_booker.py
 test_nps.py
+
 minerva-parser
-.claude/
-tests
