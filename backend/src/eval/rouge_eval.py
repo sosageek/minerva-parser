@@ -17,6 +17,20 @@ class RougeOneEvaluator(Evaluator):
     _WORD_RE = re.compile(r"\w+", re.UNICODE) # si può mettere in .eval più tardi
 
     def evaluate(self, parsed_text: str, gold_text: str) -> dict:
+        """Precision, recall e f1 sull'overlap dei token con il gold (ROUGE-1)
+
+        * precision: dei token estratti, quanti stanno davvero nel gold
+        * recall: dei token del gold, quanti il parser è riuscito a prendere
+        * f1: media armonica di precision e recall, come indicatore sintetico
+
+        Args:
+            parsed_text(str): testo estratto dal parser
+            gold_text(str): testo di riferimento del gold standard
+
+        Returns:
+            dict con chiavi ``precision``, ``recall`` ed ``f1``
+            se uno dei due testi è vuoto le metriche corrispondenti valgono zero
+        """
         c_p = Counter(self._tokenize(parsed_text))
         c_g = Counter(self._tokenize(gold_text))
         
