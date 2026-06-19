@@ -12,11 +12,20 @@ The project was developed for the *Laboratorio di Ingegneria Informatica* course
 
 The web UI lets you parse a URL — or pick one straight from the gold standard — inspect the raw HTML and the cleaned Markdown side by side with the gold text, and read the evaluation metrics for that page.
 
-![Home: input form, source info, and the cleaned parsed text next to the gold text](docs/demo-home.jpg)
+<p align="center">
+  <img src="docs/demo-home.jpg" width="600" alt="Home: input form, source info, and the cleaned parsed text next to the gold text"><br>
+  <em>Home: input form, source info, and the cleaned parsed text next to the gold text.</em>
+</p>
 
-![Raw HTML panel: the crawler output the parser works on](docs/demo-html.jpg)
+<p align="center">
+  <img src="docs/demo-html.jpg" width="600" alt="Raw HTML panel: the crawler output the parser works on"><br>
+  <em>Raw HTML panel — the crawler output the parser works on.</em>
+</p>
 
-![Per-parse evaluation: token-level, ROUGE-1 and chrF / noise ratio](docs/demo-metrics.jpg)
+<p align="center">
+  <img src="docs/demo-metrics.jpg" width="600" alt="Per-parse evaluation: token-level, ROUGE-1 and chrF / noise ratio"><br>
+  <em>Per-parse evaluation: token-level, ROUGE-1 and chrF / noise ratio.</em>
+</p>
 
 ## Architecture
 
