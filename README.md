@@ -8,6 +8,16 @@ Given the URL of a page from one of the supported domains, **Minerva Parser** do
 
 The project was developed for the *Laboratorio di Ingegneria Informatica* course at **Sapienza University of Rome**. It is intended as a data-acquisition stage for **Minerva**, the Italian national LLM developed by Sapienza NLP and Babelscape: the same kind of pipeline that lets a chatbot search the web, parse the retrieved pages, and ground its answers on up-to-date content.
 
+## Demo
+
+The web UI lets you parse a URL — or pick one straight from the gold standard — inspect the raw HTML and the cleaned Markdown side by side with the gold text, and read the evaluation metrics for that page.
+
+![Home: input form, source info, and the cleaned parsed text next to the gold text](docs/demo-home.jpg)
+
+![Raw HTML panel: the crawler output the parser works on](docs/demo-html.jpg)
+
+![Per-parse evaluation: token-level, ROUGE-1 and chrF / noise ratio](docs/demo-metrics.jpg)
+
 ## Architecture
 
 The system is split into **two containerized services** orchestrated with **Docker Compose**. The backend bind-mounts the gold-standard data as a volume; the frontend reads everything through the backend API. The code is organized in strict layers — one class per file (except `parser.py`), where each module depends only on the layer immediately below it.
