@@ -32,6 +32,7 @@ from .models import (
     TokenLevelEval,
 )
 from .registry import PARSERS, get_parser, load_gold_standards, supported_domains
+from ..db import close_pool, create_pool, initialize_schema
 
 # ---------------------------------- CONF  ----------------------------------
 
@@ -53,16 +54,23 @@ async def lifespan(app: FastAPI):
     """
 
     configure_logging()
+
+    create_pool()
+    initialize_schema()
+
     global _gs_store
     _gs_store = load_gold_standards()
+
     logger.info(
         "GS caricati: %s",
         {d: len(entries) for d, entries in _gs_store.items()},
     )
+
     try:
         yield
     finally:
         await close_crawler()
+        close_pool()
 
 
 app = FastAPI(
