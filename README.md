@@ -116,6 +116,13 @@ minerva-parser/
 
 **Requirements:** Docker and Docker Compose.
 
+The defaults work without additional setup. To customize ports, credentials or
+service URLs, copy the versioned template and edit the local file:
+
+```bash
+cp .env.example .env
+```
+
 ```bash
 docker compose up --build
 ```

@@ -2,21 +2,55 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: minerva-backend
+    container_name: parser-backend
     ports:
       - "8003:8003"
     environment:
       GS_DATA_DIR: /app/gs_data
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      CRAWLER_HEADLESS: ${CRAWLER_HEADLESS:-true}
+      DATABASE_HOST: ${DATABASE_HOST:-database}
+      DATABASE_PORT: ${DATABASE_PORT:-3306}
+      DATABASE_NAME: ${DATABASE_NAME:-parser_db}
+      DATABASE_USER: ${DATABASE_USER:-minerva}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-minerva_password}
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-5}
+      OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      STATUS_CHECK_TIMEOUT: ${STATUS_CHECK_TIMEOUT:-1.0}
     volumes:
       - ./gs_data:/app/gs_data
 
   frontend:
     build:
       context: ./frontend
-    container_name: minerva-frontend
+    container_name: parser-frontend
     ports:
       - "8004:8004"
     environment:
-      BACKEND_URL: http://backend:8003
+      BACKEND_URL: ${BACKEND_URL:-http://backend:8003}
     depends_on:
       - backend
+
+  database:
+    image: mariadb:11.4
+    container_name: parser-database
+    environment:
+      MARIADB_DATABASE: ${DATABASE_NAME:-parser_db}
+      MARIADB_USER: ${DATABASE_USER:-minerva}
+      MARIADB_PASSWORD: ${DATABASE_PASSWORD:-minerva_password}
+      MARIADB_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD:-root_password}
+    ports:
+      - "${DATABASE_PORT:-3306}:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 10s
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      - backend
+
+volumes:
+  mariadb_data:
