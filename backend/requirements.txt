@@ -4,3 +4,4 @@ fastapi>=0.110
 uvicorn[standard]>=0.27
 sacrebleu>=2.4
 python-dotenv>=1.0
+mariadb==1.1.14
