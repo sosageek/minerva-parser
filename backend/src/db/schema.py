@@ -38,7 +38,6 @@ CREATE TABLE IF NOT EXISTS gold_standard (
     CONSTRAINT fk_gold_standard_web_resource
         FOREIGN KEY (url)
         REFERENCES web_resources(url)
-        ON UPDATE CASCADE
         ON DELETE CASCADE
 )
 ENGINE=InnoDB
