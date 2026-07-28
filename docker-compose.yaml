@@ -19,6 +19,9 @@ services:
       STATUS_CHECK_TIMEOUT: ${STATUS_CHECK_TIMEOUT:-1.0}
     volumes:
       - ./gs_data:/app/gs_data
+    depends_on:
+      database:
+        condition: service_healthy
 
   frontend:
     build:
@@ -49,8 +52,6 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    depends_on:
-      - backend
 
 volumes:
   mariadb_data:
