@@ -29,12 +29,13 @@ The web UI lets you parse a URL — or pick one straight from the gold standard 
 
 ## Architecture
 
-The system is split into **two containerized services** orchestrated with **Docker Compose**. The backend bind-mounts the gold-standard data as a volume; the frontend reads everything through the backend API. The code is organized in strict layers — one class per file (except `parser.py`), where each module depends only on the layer immediately below it.
+The system is split into **three containerized services** orchestrated with **Docker Compose**. The backend bind-mounts the gold-standard data as a volume, the frontend reads everything through the backend API, and MariaDB provides the persistence layer. The code is organized in strict layers — one class per file (except `parser.py`), where each module depends only on the layer immediately below it.
 
-- **Backend** — Python 3.11 + **FastAPI**. Web acquisition uses **Crawl4AI** with **Playwright** (Chromium); **Pydantic** validates and serializes all I/O. A single shared crawler is created lazily and released safely on shutdown to avoid zombie processes. Runs on port `8003`.
+- **Backend** — Python 3.11 + **FastAPI**. Web acquisition uses **Crawl4AI** with **Playwright** (Chromium); **Pydantic** validates and serializes all I/O. A single shared crawler is created lazily and released safely on shutdown to avoid zombie processes. At startup, the application creates a MariaDB connection pool and initializes the required schema; both the crawler and the pool are closed during shutdown. Runs on port `8003`.
 - **Frontend** — A minimal, **stateless** FastAPI app that queries the backend through an `httpx.AsyncClient` (configured via `BACKEND_URL`) and renders **Jinja2** templates comparing raw HTML, `parsed_text` and `gold_text` together with their quality metrics. Runs on port `8004`.
+- **Database** — **MariaDB 11.4**, with a persistent Docker volume and a health check used to gate backend startup. The schema currently contains `web_resources` and `gold_standard`, linked through the source URL. Runs on port `3306` by default.
 
-All gold standards are loaded into memory at backend startup (handled in the FastAPI `lifespan`), so each request avoids disk I/O.
+Gold-standard JSON files remain the current application data source: they are loaded into memory during the FastAPI `lifespan`, so each request avoids disk I/O. The MariaDB schema and connection lifecycle are in place, while repository and seed integration are the next persistence step.
 
 ## Supported domains
 
@@ -57,7 +58,7 @@ Notable per-domain handling:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET`  | `/status` | Backend, database and Ollama availability (always HTTP 200) |
+| `GET`  | `/status` | Backend, MariaDB and Ollama availability (always HTTP 200) |
 | `GET`  | `/domains` | List of supported domains |
 | `GET`  | `/parse?url=` | Parse a live URL and return the clean text |
 | `POST` | `/parse` | Parse raw HTML supplied in the body (no network request) |
@@ -67,6 +68,8 @@ Notable per-domain handling:
 | `GET`  | `/full_gs_eval?domain=` | Aggregated evaluation over a domain's entire gold standard |
 
 The parse output (`ParseOutput`) contains `url`, `domain`, `title`, `html_text` and `parsed_text` (clean Markdown). Pydantic I/O schemas use `extra="forbid"` to reject out-of-spec request bodies. Interactive Swagger docs are available at `/docs`.
+
+The status endpoint reports each dependency independently. MariaDB is part of the Compose stack; Ollama is an optional external service configured through `OLLAMA_URL` and is not started by this project.
 
 ## Evaluation metrics
 
@@ -98,12 +101,13 @@ On `en.wikipedia.org` and `www.meteoam.it` recall slightly exceeds precision (th
 minerva-parser/
 ├── backend/
 │   ├── src/
+│   │   ├── db/            # MariaDB pool/schema; seed and repository integration in progress
 │   │   ├── parsers/       # parser.py (abstract Parser + CrawlError), per-domain parsers,
 │   │   │                  # _crawler.py (single shared AsyncWebCrawler), schema.py (ParsedDocument)
 │   │   ├── eval/          # eval.py (abstract Evaluator), token_level_eval.py, chrf_eval.py, rouge_eval.py
 │   │   ├── utils/         # cleaning.py (normalize_whitespace, remove_markup), markdown.py (strip_formatting)
 │   │   ├── server/        # server.py (endpoints + lifespan), models.py (Pydantic schemas), registry.py
-│   │   └── config.py      # paths, logging and crawler flags (all overridable via env vars)
+│   │   └── config.py      # paths, logging, crawler and service settings (env-overridable)
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/              # FastAPI + Jinja2 + httpx (minimal stateless UI)
@@ -132,11 +136,11 @@ Once the containers are running:
 - Web UI → http://localhost:8004
 - Backend API (Swagger) → http://localhost:8003/docs
 
-The whole stack is containerized: the backend installs Playwright/Chromium at build time, so no local Python or browser setup is needed.
+The whole stack is containerized: Compose starts MariaDB first, waits for its health check, and then starts the backend and frontend. The backend installs Playwright/Chromium at build time, so no local Python, database or browser setup is needed.
 
 ## Tech stack
 
-`Python 3.11` · `FastAPI` · `Crawl4AI` · `Playwright` · `Pydantic` · `sacrebleu` · `BeautifulSoup` · `httpx` · `Jinja2` · `Docker Compose`
+`Python 3.11` · `FastAPI` · `MariaDB 11.4` · `Crawl4AI` · `Playwright` · `Pydantic` · `sacrebleu` · `BeautifulSoup` · `httpx` · `Jinja2` · `Docker Compose`
 
 ## Contributors
 
