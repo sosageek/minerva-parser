@@ -57,6 +57,7 @@ Notable per-domain handling:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `GET`  | `/status` | Backend, database and Ollama availability (always HTTP 200) |
 | `GET`  | `/domains` | List of supported domains |
 | `GET`  | `/parse?url=` | Parse a live URL and return the clean text |
 | `POST` | `/parse` | Parse raw HTML supplied in the body (no network request) |

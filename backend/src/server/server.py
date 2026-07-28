@@ -1,4 +1,8 @@
+import asyncio
+import http.client
 import logging
+import socket
+from collections.abc import Callable
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
@@ -8,7 +12,13 @@ from ..eval import TokenLevelEvaluator, ChrFEvaluator, RougeOneEvaluator
 from ..parsers import CrawlError, Parser, ParsedDocument
 from ..parsers._crawler import close_crawler
 from ..utils import strip_formatting
-from ..config import configure_logging
+from ..config import (
+    DATABASE_HOST,
+    DATABASE_PORT,
+    OLLAMA_URL,
+    STATUS_CHECK_TIMEOUT,
+    configure_logging,
+)
 from .models import (
     EvaluationInput,
     GSEntry,
@@ -16,6 +26,8 @@ from .models import (
     ParseEvaluation,
     ParseInput,
     ParseOutput,
+    ServiceStatus,
+    StatusOutput,
     SupportedDomains,
     TokenLevelEval,
 )
@@ -166,6 +178,56 @@ def _prepare_for_eval(text: str) -> str:
     return strip_formatting(text)
 
 
+def _database_is_available() -> bool:
+    """Verifica che MariaDB accetti connessioni TCP."""
+
+    with socket.create_connection(
+        (DATABASE_HOST, DATABASE_PORT),
+        timeout=STATUS_CHECK_TIMEOUT,
+    ):
+        return True
+
+
+def _ollama_is_available() -> bool:
+    """Verifica l'API di Ollama senza richiedere che un modello sia già caricato."""
+
+    parsed_url = urlparse(OLLAMA_URL)
+    if parsed_url.scheme not in ("http", "https") or not parsed_url.hostname:
+        return False
+
+    connection_class = (
+        http.client.HTTPSConnection
+        if parsed_url.scheme == "https"
+        else http.client.HTTPConnection
+    )
+    connection = connection_class(
+        parsed_url.hostname,
+        parsed_url.port,
+        timeout=STATUS_CHECK_TIMEOUT,
+    )
+    base_path = parsed_url.path.rstrip("/")
+    try:
+        connection.request("GET", f"{base_path}/api/tags")
+        response = connection.getresponse()
+        response.read()
+        return 200 <= response.status < 300
+    finally:
+        connection.close()
+
+
+def _service_status(
+    check: Callable[[], bool],
+    service_name: str,
+) -> ServiceStatus:
+    """Converte ogni errore del probe nello stato degradato previsto dal contratto."""
+
+    try:
+        return "ok" if check() else "unavailable"
+    except Exception as err:
+        logger.warning("status check %s fallito: %s", service_name, err)
+        return "unavailable"
+
+
 def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
     """Calcola le metriche di evaluation per una coppia (parsed, gold)
 
@@ -190,6 +252,29 @@ def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
     )
 
 # ---------------------------------- API  ----------------------------------
+
+
+@app.get("/status", response_model=StatusOutput, status_code=200)
+async def status() -> StatusOutput:
+    """Restituisce sempre lo stato del backend e delle dipendenze esterne."""
+
+    database_status, ollama_status = await asyncio.gather(
+        asyncio.to_thread(
+            _service_status,
+            _database_is_available,
+            "database",
+        ),
+        asyncio.to_thread(
+            _service_status,
+            _ollama_is_available,
+            "ollama",
+        ),
+    )
+    return StatusOutput(
+        backend="ok",
+        database=database_status,
+        ollama=ollama_status,
+    )
 
 
 @app.get("/parse", response_model=ParseOutput)

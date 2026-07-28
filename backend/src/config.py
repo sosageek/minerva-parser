@@ -18,6 +18,12 @@ CRAWLER_HEADLESS: bool = os.environ.get("CRAWLER_HEADLESS", "true").lower() == "
 # il default di crawl4ai dovrebbe essere true quindi non c'era bisogno di esplicitare fallback
 # spero di non sbagliarmi (gabriele)
 
+# configurazione servizi esterni
+DATABASE_HOST: str = os.environ.get("DATABASE_HOST", "database")
+DATABASE_PORT: int = int(os.environ.get("DATABASE_PORT", "3306"))
+OLLAMA_URL: str = os.environ.get("OLLAMA_URL", "http://ollama:11434")
+STATUS_CHECK_TIMEOUT: float = float(os.environ.get("STATUS_CHECK_TIMEOUT", "1.0"))
+
 
 def configure_logging() -> None:
     """Inizializza logger con formato e livello coerenti

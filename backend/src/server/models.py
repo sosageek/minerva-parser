@@ -1,5 +1,19 @@
-from typing import Any
+from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
+
+
+ServiceStatus = Literal["ok", "unavailable"]
+
+
+class StatusOutput(BaseModel):
+    """Stato del backend e dei servizi esterni usati dall'applicazione."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    backend: ServiceStatus
+    database: ServiceStatus
+    ollama: ServiceStatus
+
 
 class ParseInput(BaseModel):
     """Body di POST /parse
