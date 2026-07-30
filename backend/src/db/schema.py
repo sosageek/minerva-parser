@@ -57,11 +57,11 @@ def initialize_schema() -> None:
         # NON INVERTIRE: prima la tabella principale, poi quella con la foreign key
 
         connection.commit()
-        logger.info("Schema MariaDB inizializzato")
+        logger.info("Schema inizializzato")
 
     except mariadb.Error:
         connection.rollback()
-        logger.exception("Inizializzazione schema MariaDB fallita")
+        logger.exception("Inizializzazione schema fallita")
         raise
 
     finally:

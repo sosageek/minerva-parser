@@ -5,3 +5,4 @@ from .database import (
     ping_database,
 )
 from .schema import initialize_schema
+from .seed import seed_gold_standards

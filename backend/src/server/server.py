@@ -1,7 +1,6 @@
 import asyncio
 import http.client
 import logging
-import socket
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
@@ -13,8 +12,6 @@ from ..parsers import CrawlError, Parser, ParsedDocument
 from ..parsers._crawler import close_crawler
 from ..utils import strip_formatting
 from ..config import (
-    DATABASE_HOST,
-    DATABASE_PORT,
     OLLAMA_URL,
     STATUS_CHECK_TIMEOUT,
     configure_logging,
@@ -31,8 +28,14 @@ from .models import (
     SupportedDomains,
     TokenLevelEval,
 )
+from ..db import (
+    close_pool,
+    create_pool,
+    initialize_schema,
+    ping_database,
+    seed_gold_standards,
+)
 from .registry import PARSERS, get_parser, load_gold_standards, supported_domains
-from ..db import close_pool, create_pool, initialize_schema
 
 # ---------------------------------- CONF  ----------------------------------
 
@@ -55,22 +58,26 @@ async def lifespan(app: FastAPI):
 
     configure_logging()
 
-    create_pool()
-    initialize_schema()
-
-    global _gs_store
-    _gs_store = load_gold_standards()
-
-    logger.info(
-        "GS caricati: %s",
-        {d: len(entries) for d, entries in _gs_store.items()},
-    )
-
     try:
+        create_pool()
+        initialize_schema()
+        seed_gold_standards()
+
+        global _gs_store
+        _gs_store = load_gold_standards()
+
+        logger.info(
+            "GS caricati: %s",
+            {d: len(entries) for d, entries in _gs_store.items()},
+        )
+
         yield
+
     finally:
-        await close_crawler()
-        close_pool()
+        try:
+            await close_crawler()
+        finally:
+            close_pool()
 
 
 app = FastAPI(
@@ -187,13 +194,9 @@ def _prepare_for_eval(text: str) -> str:
 
 
 def _database_is_available() -> bool:
-    """Verifica che MariaDB accetti connessioni TCP."""
+    """Verifica MariaDB tramite il connection pool."""
 
-    with socket.create_connection(
-        (DATABASE_HOST, DATABASE_PORT),
-        timeout=STATUS_CHECK_TIMEOUT,
-    ):
-        return True
+    return ping_database()
 
 
 def _ollama_is_available() -> bool:

@@ -42,7 +42,7 @@ def create_pool() -> None:
         )
 
     except mariadb.Error:
-        logger.exception("Creazione pool MariaDB fallita")
+        logger.exception("Creazione pool di connessioni fallita")
         raise
 
 
@@ -89,7 +89,7 @@ def close_pool() -> None:
 
     try:
         _pool.close()
-        logger.info("Pool MAriaDB chiuso")
+        logger.info("Pool di connessioni chiuso")
 
     finally:
         _pool = None
