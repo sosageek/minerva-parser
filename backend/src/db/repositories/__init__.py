@@ -1,1 +1,1 @@
-from . import gold_standard, web_resources
+from . import gold_standard, metadata, web_resources

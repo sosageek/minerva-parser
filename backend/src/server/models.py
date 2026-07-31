@@ -1,6 +1,5 @@
 from typing import Any, Literal
-
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
 ServiceStatus = Literal["ok", "unavailable"]
@@ -14,6 +13,32 @@ class StatusOutput(BaseModel):
     backend: ServiceStatus
     database: ServiceStatus
     ollama: ServiceStatus
+
+
+class DBSchema(RootModel[dict[str, dict[str, str]]]):
+    """Output di GET /db_schema"""
+
+
+class DBStats(BaseModel):
+    """Output di GET /db_stats
+
+    Attributes:
+        web_resources(dict[str, int]): numero di risorse per dominio
+        gold_standard(dict[str, int]): numero di GS per dominio
+        avg_eval(dict[str, dict[str, Any]]): metriche medie salvate nel database
+        avg_eval_judge(dict[str, dict[str, Any]]): giudizi medi salvati nel database
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    web_resources: dict[str, int]
+    gold_standard: dict[str, int]
+    avg_eval: dict[str, dict[str, Any]] = Field(
+        default_factory=dict
+    )
+    avg_eval_judge: dict[str, dict[str, Any]] = Field(
+        default_factory=dict
+    )
 
 
 class ParseInput(BaseModel):

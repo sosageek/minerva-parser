@@ -21,14 +21,19 @@ from ..db import (
     ping_database,
     seed_gold_standards,
 )
-from ..db.repositories import gold_standard as gold_standard_repository
-from ..db.repositories import web_resources as web_resource_repository
+from ..db.repositories import (
+    gold_standard as gold_standard_repository,
+    web_resources as web_resource_repository,
+    metadata as metadata_repository,
+)
 from ..eval import ChrFEvaluator, RougeOneEvaluator, TokenLevelEvaluator
 from ..parsers import CrawlError, ParsedDocument, Parser
 from ..parsers._crawler import close_crawler
 from ..utils import strip_formatting
 from .models import (
     CRUDStatus,
+    DBSchema,
+    DBStats,
     EvaluationInput,
     GoldStandardInput,
     GoldStandardURLs,
@@ -305,6 +310,28 @@ async def status() -> StatusOutput:
         backend="ok",
         database=database_status,
         ollama=ollama_status,
+    )
+
+
+@app.get("/db_schema", response_model=DBSchema)
+def db_schema() -> DBSchema:
+    """Schema delle tabelle obbligatorie del database"""
+
+    schema = metadata_repository.get_schema()
+
+    return DBSchema(root=schema)
+
+
+@app.get("/db_stats", response_model=DBStats)
+def db_stats() -> DBStats:
+    """Statistiche dei dati salvati nel database"""
+
+    web_resources = web_resource_repository.count_by_domain()
+    gold_standard = gold_standard_repository.count_by_domain()
+
+    return DBStats(
+        web_resources=web_resources,
+        gold_standard=gold_standard,
     )
 
 
