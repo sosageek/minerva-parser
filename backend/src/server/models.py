@@ -1,4 +1,5 @@
 from typing import Any, Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -95,6 +96,84 @@ class ListGSEntry(BaseModel):
     gold_standard: list[GSEntry]
 
 
+class GoldStandardURLs(BaseModel):
+    """Output di GET /gold_standard_urls
+
+    Attributes:
+        gold_standard_urls(list[str]): lista degli URL presenti nel GS
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    gold_standard_urls: list[str]
+
+
+class WebResourceInput(BaseModel):
+    """Body di POST /add_web_resource
+
+    Attributes:
+        url(str): URL della risorsa
+        html_text(str): HTML grezzo da salvare nel database
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    url: str
+    html_text: str
+
+
+class GoldStandardInput(BaseModel):
+    """Body di POST /add_gold_standard
+
+    Attributes:
+        url(str): URL della web resource associata
+        gold_text(str): testo gold da salvare nel database
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+    gold_text: str
+
+
+class URLInput(BaseModel):
+    """Body degli endpoint DELETE
+
+    Attributes:
+        url(str): URL dell'elemento da cancellare
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+
+
+class CRUDStatus(BaseModel):
+    """Output degli endpoint CRUD
+
+    Attributes:
+        status(str): esito dell'operazione
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["ok", "error"]
+
+
+class EvaluationInput(BaseModel):
+    """Body di POST /evaluate
+    
+    Attributes:
+        parsed_text(str): testo estratto da valutare
+        gold_text(str): gold text di riferimento
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    parsed_text: str
+    gold_text: str
+
+
 class TokenLevelEval(BaseModel):
     """Metriche token-level (precision, recall, f1)
 
@@ -111,20 +190,6 @@ class TokenLevelEval(BaseModel):
     precision: float
     recall: float
     f1: float
-
-
-class EvaluationInput(BaseModel):
-    """Body di POST /evaluate
-    
-    Attributes:
-        parsed_text(str): testo estratto da valutare
-        gold_text(str): gold text di riferimento
-    """
-
-    model_config = ConfigDict(extra="forbid")
-
-    parsed_text: str
-    gold_text: str
 
 
 class ParseEvaluation(BaseModel):

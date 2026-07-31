@@ -5,19 +5,33 @@ from collections.abc import Callable
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
+import mariadb
+from bs4 import BeautifulSoup
 from fastapi import FastAPI, HTTPException, Query
 
-from ..eval import TokenLevelEvaluator, ChrFEvaluator, RougeOneEvaluator
-from ..parsers import CrawlError, Parser, ParsedDocument
-from ..parsers._crawler import close_crawler
-from ..utils import strip_formatting
 from ..config import (
     OLLAMA_URL,
     STATUS_CHECK_TIMEOUT,
     configure_logging,
 )
+from ..db import (
+    close_pool,
+    create_pool,
+    initialize_schema,
+    ping_database,
+    seed_gold_standards,
+)
+from ..db.repositories import gold_standard as gold_standard_repository
+from ..db.repositories import web_resources as web_resource_repository
+from ..eval import ChrFEvaluator, RougeOneEvaluator, TokenLevelEvaluator
+from ..parsers import CrawlError, ParsedDocument, Parser
+from ..parsers._crawler import close_crawler
+from ..utils import strip_formatting
 from .models import (
+    CRUDStatus,
     EvaluationInput,
+    GoldStandardInput,
+    GoldStandardURLs,
     GSEntry,
     ListGSEntry,
     ParseEvaluation,
@@ -27,21 +41,15 @@ from .models import (
     StatusOutput,
     SupportedDomains,
     TokenLevelEval,
+    URLInput,
+    WebResourceInput,
 )
-from ..db import (
-    close_pool,
-    create_pool,
-    initialize_schema,
-    ping_database,
-    seed_gold_standards,
-)
-from .registry import PARSERS, get_parser, load_gold_standards, supported_domains
+from .registry import PARSERS, get_parser, supported_domains
 
 # ---------------------------------- CONF  ----------------------------------
 
 logger = logging.getLogger("minerva-parser.api")
 
-_gs_store: dict[str, list[dict]] = {}
 _evaluator = TokenLevelEvaluator()
 _chrf = ChrFEvaluator()
 _rouge1 = RougeOneEvaluator()
@@ -52,8 +60,8 @@ async def lifespan(app: FastAPI):
     """Avvio e chiusura del server
 
     * configura il logging (formato e livello centralizzati in ``config.py``)
-    * all'avvio carica in memoria tutti i GS (failfast se manca un file)
-    * alla chiusura chiude il crawler condiviso evitando processi zombie
+    * crea il pool, inizializza lo schema e popola il database
+    * alla chiusura chiude il crawler condiviso e il pool di connessioni
     """
 
     configure_logging()
@@ -62,14 +70,6 @@ async def lifespan(app: FastAPI):
         create_pool()
         initialize_schema()
         seed_gold_standards()
-
-        global _gs_store
-        _gs_store = load_gold_standards()
-
-        logger.info(
-            "GS caricati: %s",
-            {d: len(entries) for d, entries in _gs_store.items()},
-        )
 
         yield
 
@@ -89,6 +89,7 @@ app = FastAPI(
 
 # ---------------------------------- HELPER  ----------------------------------
 
+
 def _extract_domain(url: str) -> str:
     """Estrae netloc da un URL
 
@@ -106,6 +107,24 @@ def _extract_domain(url: str) -> str:
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise HTTPException(status_code=400, detail="malformed URL")
     return parsed.netloc
+
+
+def _extract_title_from_html(html_text: str) -> str:
+    """Estrae il contenuto del tag title da un documento HTML
+
+    Args:
+        html_text: HTML grezzo della pagina
+
+    Returns:
+        titolo della pagina, oppure stringa vuota se non è presente
+    """
+
+    soup = BeautifulSoup(html_text, "html.parser")
+
+    if soup.title is None:
+        return ""
+
+    return soup.title.get_text(" ", strip=True)
 
 
 def _require_parser(domain: str) -> Parser:
@@ -193,14 +212,38 @@ def _prepare_for_eval(text: str) -> str:
     return strip_formatting(text)
 
 
+def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
+    """Calcola le metriche di evaluation per una coppia (parsed, gold)
+
+    * ``token_level_eval``: precision, recall, f1 (set)
+    * ``x_eval``: `chrf``, ``noise_ratio`` e ``rouge_1``
+
+    Returns:
+        ``ParseEvaluation`` con ``token_level_eval`` e ``x_eval``
+    """
+
+    parsed_clean = _prepare_for_eval(parsed_text)
+    gold_clean = _prepare_for_eval(gold_text)
+    token_metrics = _evaluator.evaluate(parsed_clean, gold_clean)
+    x_eval = {
+        "chrf": _chrf.evaluate(parsed_clean, gold_clean),
+        "noise_ratio": _evaluator.noise_ratio(parsed_clean, gold_clean),
+        "rouge_1": _rouge1.evaluate(parsed_clean, gold_clean),
+    }
+    return ParseEvaluation(
+        token_level_eval=TokenLevelEval(**token_metrics),
+        x_eval=x_eval,
+    )
+
+
 def _database_is_available() -> bool:
-    """Verifica MariaDB tramite il connection pool."""
+    """Verifica MariaDB tramite il connection pool"""
 
     return ping_database()
 
 
 def _ollama_is_available() -> bool:
-    """Verifica l'API di Ollama senza richiedere che un modello sia già caricato."""
+    """Verifica l'API di Ollama senza richiedere che un modello sia già caricato"""
 
     parsed_url = urlparse(OLLAMA_URL)
     if parsed_url.scheme not in ("http", "https") or not parsed_url.hostname:
@@ -230,7 +273,7 @@ def _service_status(
     check: Callable[[], bool],
     service_name: str,
 ) -> ServiceStatus:
-    """Converte ogni errore del probe nello stato degradato previsto dal contratto."""
+    """Converte ogni errore del probe nello stato degradato previsto dal contratto"""
 
     try:
         return "ok" if check() else "unavailable"
@@ -239,35 +282,12 @@ def _service_status(
         return "unavailable"
 
 
-def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
-    """Calcola le metriche di evaluation per una coppia (parsed, gold)
-
-    * ``token_level_eval``: precision, recall, f1 (set)
-    * ``x_eval``: `chrf``, ``noise_ratio`` e ``rouge_1``
-
-    Returns:
-        ``ParseEvaluation`` con ``token_level_eval`` e ``x_eval``
-    """
-
-    parsed_clean = _prepare_for_eval(parsed_text)
-    gold_clean = _prepare_for_eval(gold_text)
-    token_metrics = _evaluator.evaluate(parsed_clean, gold_clean)
-    x_eval = {
-        "chrf": _chrf.evaluate(parsed_clean, gold_clean),
-        "noise_ratio": _evaluator.noise_ratio(parsed_clean, gold_clean),
-        "rouge_1": _rouge1.evaluate(parsed_clean, gold_clean),
-    }
-    return ParseEvaluation(
-        token_level_eval=TokenLevelEval(**token_metrics),
-        x_eval=x_eval,
-    )
-
 # ---------------------------------- API  ----------------------------------
 
 
 @app.get("/status", response_model=StatusOutput, status_code=200)
 async def status() -> StatusOutput:
-    """Restituisce sempre lo stato del backend e delle dipendenze esterne."""
+    """Restituisce sempre lo stato del backend e delle dipendenze esterne"""
 
     database_status, ollama_status = await asyncio.gather(
         asyncio.to_thread(
@@ -286,6 +306,13 @@ async def status() -> StatusOutput:
         database=database_status,
         ollama=ollama_status,
     )
+
+
+@app.get("/domains", response_model=SupportedDomains)
+def domains() -> SupportedDomains:
+    """Lista dei domini supportati dal sistema"""
+
+    return SupportedDomains(domains=supported_domains())
 
 
 @app.get("/parse", response_model=ParseOutput)
@@ -328,15 +355,14 @@ async def parse_html(payload: ParseInput) -> ParseOutput:
     return ParseOutput(**doc.model_dump())
 
 
-@app.get("/domains", response_model=SupportedDomains)
-def domains() -> SupportedDomains:
-    """Lista dei domini supportati dal sistema"""
-    return SupportedDomains(domains=supported_domains())
-
-
 @app.get("/gold_standard", response_model=GSEntry)
-def gold_standard(url: str = Query(..., description="URL presente nel gold standard")) -> GSEntry:
-    """Entry del GS per l'url dato
+def get_gold_standard(
+    url: str = Query(
+        ...,
+        description="URL presente nel Gold Standard",
+    ),
+) -> GSEntry:
+    """Entry del GS per l'URL dato
 
     Raises:
         HTTPException(400): dominio non supportato
@@ -344,17 +370,25 @@ def gold_standard(url: str = Query(..., description="URL presente nel gold stand
     """
 
     domain = _extract_domain(url)
+    entry = gold_standard_repository.get_by_url(url)
+
+    if entry is not None:
+        return GSEntry(**entry)
+
     _require_supported_domain(domain)
 
-    for entry in _gs_store.get(domain, []):
-        if entry["url"] == url:
-            return GSEntry(**entry)
-    raise HTTPException(status_code=404, detail=f"URL not in gold standard: {url}")
+    raise HTTPException(
+        status_code=404,
+        detail=f"URL not in gold standard: {url}",
+    )
 
 
 @app.get("/full_gold_standard", response_model=ListGSEntry)
 def full_gold_standard(
-    domain: str = Query(..., description="Dominio per cui restituire il GS"),
+    domain: str = Query(
+        ...,
+        description="Dominio per cui restituire il GS",
+    ),
 ) -> ListGSEntry:
     """Tutte le entry del GS per un dominio
 
@@ -363,8 +397,161 @@ def full_gold_standard(
     """
 
     _require_supported_domain(domain)
-    entries = [GSEntry(**e) for e in _gs_store.get(domain, [])]
-    return ListGSEntry(gold_standard=entries)
+
+    entries = gold_standard_repository.list_by_domain(domain)
+
+    return ListGSEntry(
+        gold_standard=[
+            GSEntry(**entry)
+            for entry in entries
+        ]
+    )
+
+
+@app.get("/gold_standard_urls", response_model=GoldStandardURLs)
+def gold_standard_urls(
+    domain: str | None = Query(
+        default=None,
+        description="Filtra opzionalmente le URL per dominio",
+    ),
+) -> GoldStandardURLs:
+    """Lista degli URL presenti nel GS
+
+    Raises:
+        HTTPException(400): dominio non supportato
+    """
+
+    if domain is not None:
+        _require_supported_domain(domain)
+
+    urls = gold_standard_repository.list_urls(domain)
+
+    return GoldStandardURLs(gold_standard_urls=urls)
+
+
+@app.post("/add_web_resource", response_model=CRUDStatus)
+def add_web_resource(payload: WebResourceInput) -> CRUDStatus:
+    """Aggiunge o aggiorna una web resource nel database
+
+    Args:
+        payload: body con URL e HTML grezzo della risorsa
+
+    Returns:
+        stato dell'operazione
+    """
+
+    try:
+        domain = _extract_domain(payload.url)
+
+        title = _extract_title_from_html(payload.html_text)
+
+        web_resource_repository.upsert(
+            url=payload.url,
+            domain=domain,
+            title=title,
+            html_text=payload.html_text,
+        )
+
+    except (HTTPException, mariadb.Error):
+        logger.exception(
+            "Inserimento web resource fallito: %s",
+            payload.url,
+        )
+        return CRUDStatus(status="error")
+
+    return CRUDStatus(status="ok")
+
+
+@app.post("/add_gold_standard", response_model=CRUDStatus)
+def add_gold_standard(payload: GoldStandardInput) -> CRUDStatus:
+    """Aggiunge o aggiorna un Gold Standard
+
+    Args:
+        payload: body con URL e testo gold
+
+    Returns:
+        stato dell'operazione
+    """
+
+    web_resource = web_resource_repository.get_by_url(
+        payload.url,
+    )
+
+    if web_resource is None:
+        return CRUDStatus(status="error")
+
+    try:
+        gold_standard_repository.upsert(
+            url=payload.url,
+            gold_text=payload.gold_text,
+        )
+
+    except mariadb.Error:
+        logger.exception(
+            "Inserimento Gold Standard fallito: %s",
+            payload.url,
+        )
+        return CRUDStatus(status="error")
+
+    return CRUDStatus(status="ok")
+
+
+@app.delete("/gold_standard", response_model=CRUDStatus)
+def delete_gold_standard(payload: URLInput) -> CRUDStatus:
+    """Elimina il Gold Standard lasciando la web resource
+
+    Args:
+        payload: body con l'URL del Gold Standard
+
+    Returns:
+        stato dell'operazione
+    """
+
+    try:
+        deleted = gold_standard_repository.delete_by_url(
+            payload.url,
+        )
+
+    except mariadb.Error:
+        logger.exception(
+            "Cancellazione Gold Standard fallita: %s",
+            payload.url,
+        )
+        return CRUDStatus(status="error")
+
+    if not deleted:
+        return CRUDStatus(status="error")
+
+    return CRUDStatus(status="ok")
+
+
+@app.delete("/web_resource", response_model=CRUDStatus)
+def delete_web_resource(payload: URLInput) -> CRUDStatus:
+    """Elimina una web resource e il relativo GS a cascata
+
+    Args:
+        payload: body con l'URL della web resource
+
+    Returns:
+        stato dell'operazione
+    """
+
+    try:
+        deleted = web_resource_repository.delete_by_url(
+            payload.url,
+        )
+
+    except mariadb.Error:
+        logger.exception(
+            "Cancellazione web resource fallita: %s",
+            payload.url,
+        )
+        return CRUDStatus(status="error")
+
+    if not deleted:
+        return CRUDStatus(status="error")
+
+    return CRUDStatus(status="ok")
 
 
 @app.post("/evaluate", response_model=ParseEvaluation)
@@ -400,7 +587,10 @@ async def full_gs_eval(
     """
 
     _require_supported_domain(domain)
-    entries = _gs_store.get(domain, [])
+    entries = await asyncio.to_thread(
+        gold_standard_repository.list_by_domain,
+        domain,
+    )
 
     precisions: list[float] = []
     recalls: list[float] = []
