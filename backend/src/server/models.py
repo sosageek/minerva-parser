@@ -21,13 +21,13 @@ class ParseInput(BaseModel):
 
     Attributes:
         url(str): URL sorgente
-        html_text(str): HTML già scaricato dal client, sul cui il parser lavora senza effettuare una nuova richiesta
+        local(bool): se True usa l'HTML salvato nel database
     """
 
     model_config = ConfigDict(extra="forbid")
 
     url: str
-    html_text: str
+    local: bool = False
 
 
 class ParseOutput(BaseModel):

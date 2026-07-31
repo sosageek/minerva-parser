@@ -335,24 +335,56 @@ async def parse(url: str = Query(..., description="URL assoluto da parsare")) ->
 
 
 @app.post("/parse", response_model=ParseOutput)
-async def parse_html(payload: ParseInput) -> ParseOutput:
-    """Esegue il parser appropriato su un HTML fornito dal client
+async def parse_document(payload: ParseInput) -> ParseOutput:
+    """Esegue il parser in modalità Live o Local
 
-    a differenza di GET /parse non viene fatta alcuna richiesta di rete
+    In modalità Live scarica la pagina e salva la web resource.
+    In modalità Local usa esclusivamente l'HTML presente nel database.
 
     Args:
-        payload: body con ``url`` (usato per selezionare il parser) e ``html_text``
+        payload: body con URL e modalità di parsing
 
     Returns:
-        ``ParseOutput`` con ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``
+        ``ParseOutput`` con i dati estratti dal parser
 
     Raises:
-        HTTPException(400): dominio non supportato o URL malformato
-        HTTPException(422): body mancante o invalido (gestito da FastAPI)
+        HTTPException(400): URL malformato o dominio non supportato
+        HTTPException(404): URL non presente nel database in modalità Local
+        HTTPException(502): URL irraggiungibile in modalità Live
     """
 
-    doc = await _do_parse(payload.url, html_text=payload.html_text)
-    return ParseOutput(**doc.model_dump())
+    domain = _extract_domain(payload.url)
+    _require_supported_domain(domain)
+
+    if payload.local:
+        resource = await asyncio.to_thread(
+            web_resource_repository.get_by_url,
+            payload.url,
+        )
+
+        if resource is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"URL not in database: {payload.url}",
+            )
+
+        document = await _do_parse(
+            payload.url,
+            html_text=resource["html_text"],
+        )
+
+    else:
+        document = await _do_parse(payload.url)
+
+        await asyncio.to_thread(
+            web_resource_repository.upsert,
+            payload.url,
+            document.domain,
+            document.title,
+            document.html_text,
+        )
+
+    return ParseOutput(**document.model_dump())
 
 
 @app.get("/gold_standard", response_model=GSEntry)
