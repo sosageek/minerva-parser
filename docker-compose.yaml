@@ -16,11 +16,15 @@ services:
       DATABASE_PASSWORD: ${DATABASE_PASSWORD:-minerva_password}
       DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-5}
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-120}
       STATUS_CHECK_TIMEOUT: ${STATUS_CHECK_TIMEOUT:-1.0}
     volumes:
       - ./gs_data:/app/gs_data
     depends_on:
       database:
+        condition: service_healthy
+      ollama:
         condition: service_healthy
 
   frontend:
@@ -53,5 +57,33 @@ services:
       timeout: 5s
       retries: 10
 
+  ollama:
+    image: ollama/ollama
+    container_name: parser-ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: "-1"
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # l'immagine avvia solo il server, il pull va esplicitato a parte
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        ollama serve &
+        pid=$$!
+        until ollama list >/dev/null 2>&1; do sleep 1; done
+        ollama pull "$$OLLAMA_MODEL" || echo "pull fallito"
+        wait $$pid
+    # healthy solo a modello scaricato, il backend non deve partire prima
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list | grep -q $$OLLAMA_MODEL"]
+      start_period: 60s
+      interval: 10s
+      timeout: 10s
+      retries: 60
+
 volumes:
   mariadb_data:
+  ollama_data:
