@@ -29,13 +29,14 @@ The web UI lets you parse a URL — or pick one straight from the gold standard 
 
 ## Architecture
 
-The system is split into **three containerized services** orchestrated with **Docker Compose**. The backend bind-mounts the gold-standard data as a volume, the frontend reads everything through the backend API, and MariaDB provides the persistence layer. The code is organized in strict layers — one class per file (except `parser.py`), where each module depends only on the layer immediately below it.
+The system is split into **four containerized services** orchestrated with **Docker Compose**. The backend bind-mounts the gold-standard data as a volume, the frontend reads everything through the backend API, MariaDB provides the persistence layer, and Ollama runs the local LLM-as-a-Judge.
 
 - **Backend** — Python 3.11 + **FastAPI**. Web acquisition uses **Crawl4AI** with **Playwright** (Chromium); **Pydantic** validates and serializes all I/O. A single shared crawler is created lazily and released safely on shutdown to avoid zombie processes. At startup, the application creates a MariaDB connection pool and initializes the required schema; both the crawler and the pool are closed during shutdown. Runs on port `8003`.
 - **Frontend** — A minimal, **stateless** FastAPI app that queries the backend through an `httpx.AsyncClient` (configured via `BACKEND_URL`) and renders **Jinja2** templates comparing raw HTML, `parsed_text` and `gold_text` together with their quality metrics. Runs on port `8004`.
-- **Database** — **MariaDB 11.4**, with a persistent Docker volume and a health check used to gate backend startup. The schema currently contains `web_resources` and `gold_standard`, linked through the source URL. Runs on port `3306` by default.
+- **Database** — **MariaDB 11.4**, with a persistent Docker volume and a health check used to gate backend startup. The schema contains `web_resources`, `gold_standard`, `evaluation_results` and `judge_results`, linked through the source URL with cascading foreign keys. Runs on port `3306` by default.
+- **Ollama** — local **qwen3:4b** inference service for the qualitative Judge. Compose downloads the model on first startup, persists it in a named volume and marks the service healthy only when the model is present. Runs on port `11434`.
 
-Gold-standard JSON files remain the current application data source: they are loaded into memory during the FastAPI `lifespan`, so each request avoids disk I/O. The MariaDB schema and connection lifecycle are in place, while repository and seed integration are the next persistence step.
+At startup, the backend validates the versioned Gold Standard and the 41 precomputed evaluation records, then idempotently seeds MariaDB. Aggregated endpoints read only persisted metrics and judgments, so they never trigger an expensive multi-document crawl or live LLM batch.
 
 ## Supported domains
 
@@ -65,11 +66,14 @@ Notable per-domain handling:
 | `GET`  | `/gold_standard?url=` | Gold-standard entry for a URL |
 | `GET`  | `/full_gold_standard?domain=` | Full gold standard for a domain |
 | `POST` | `/evaluate` | Evaluate a `parsed_text` against a `gold_text` |
-| `GET`  | `/full_gs_eval?domain=` | Aggregated evaluation over a domain's entire gold standard |
+| `POST` | `/evaluate_judge` | Qualitative evaluation with `qwen3:4b` and strict score 1–5 |
+| `GET`  | `/full_gs_eval?domain=` | Persisted aggregate metrics and Judge score for a domain |
+| `GET`  | `/db_schema` | Database schema metadata |
+| `GET`  | `/db_stats` | Counts and persisted evaluation averages by domain |
 
 The parse output (`ParseOutput`) contains `url`, `domain`, `title`, `html_text` and `parsed_text` (clean Markdown). Pydantic I/O schemas use `extra="forbid"` to reject out-of-spec request bodies. Interactive Swagger docs are available at `/docs`.
 
-The status endpoint reports each dependency independently. MariaDB is part of the Compose stack; Ollama is an optional external service configured through `OLLAMA_URL` and is not started by this project.
+The status endpoint reports each dependency independently using only `"ok"` or `"error"`, and always returns HTTP 200. Both MariaDB and Ollama are part of the Compose stack.
 
 ## Evaluation metrics
 
@@ -80,18 +84,20 @@ Since the parser is allowed to return Markdown but the gold standards are plain 
 - **ROUGE-1 (multiset)** — like the token-level metric but `Counter`-based, so it also accounts for repetitions (e.g. a duplicated widget).
 - **chrF** — character n-gram F-score via `sacrebleu` (`n = 6`, `β = 2`), normalized to `[0, 1]`; useful where morphological variants and tokenization differences would unfairly lower the token-level score.
 
-`/full_gs_eval` runs parsing + evaluation over every GS entry of a domain and **averages** the results; if some URLs fail to crawl, the aggregate is computed only on the successful ones (failures are reported in `failed_urls`).
+The LLM-as-a-Judge compares each parsed text with its reference and returns a strict integer score from 1 to 5, short feedback and any detected extra noise. It uses prompt version `v8`, `qwen3:4b`, deterministic decoding and a single repair retry for malformed JSON; timeout or model errors produce a neutral score of 3 without propagating exceptions.
+
+`/full_gs_eval` and `/db_stats` aggregate the 41 versioned records already stored in MariaDB. The persisted Judge fields are `model_name`, `judge_score`, `judge_feedback`, `extra_noise` and `prompt_version`; internal diagnostics and latency are intentionally not stored.
 
 ### Results
 
-Global aggregated averages per domain — all four parsers land comfortably in the "Good" band (F1 > 0.80), reaching F1 ≈ 0.99:
+Versioned aggregate averages for the 41 Gold Standard entries — all four parsers land comfortably in the "Good" band (F1 > 0.80):
 
 | Domain | Token-level F1 | ROUGE-1 F1 | Noise | chrF |
 |--------|:---:|:---:|:---:|:---:|
-| `en.wikipedia.org` | 0.991 | 0.993 | 0.009 | 0.992 |
+| `en.wikipedia.org` | 0.994 | 0.994 | 0.009 | 0.995 |
 | `thebookerprizes.com` | 0.995 | 0.987 | 0.005 | 0.966 |
 | `www.nps.gov` | 0.990 | 0.985 | 0.002 | 0.973 |
-| `www.meteoam.it` | 0.987 | 0.978 | 0.012 | 0.983 |
+| `www.meteoam.it` | 0.942 | 0.924 | 0.013 | 0.908 |
 
 On `en.wikipedia.org` and `www.meteoam.it` recall slightly exceeds precision (the parser keeps almost all gold content at the cost of a little residual noise). On `thebookerprizes.com` and `www.nps.gov` the relationship inverts: these pages are noisier and full of promotional content and inline junk that CSS selectors can't remove, so the cleaning heuristics had to be more aggressive — pushing precision toward 1.0 while dropping some genuine content, a deliberate recall/precision trade-off.
 
@@ -101,17 +107,19 @@ On `en.wikipedia.org` and `www.meteoam.it` recall slightly exceeds precision (th
 minerva-parser/
 ├── backend/
 │   ├── src/
-│   │   ├── db/            # MariaDB pool/schema; seed and repository integration in progress
+│   │   ├── db/            # MariaDB pool, schema, idempotent seeds and repositories
 │   │   ├── parsers/       # parser.py (abstract Parser + CrawlError), per-domain parsers,
 │   │   │                  # _crawler.py (single shared AsyncWebCrawler), schema.py (ParsedDocument)
 │   │   ├── eval/          # eval.py (abstract Evaluator), token_level_eval.py, chrf_eval.py, rouge_eval.py
+│   │   ├── judge/         # Ollama client, prompt v8, strict JudgeResult and fallback logic
+│   │   ├── tools/         # offline generator for the 41 precomputed records
 │   │   ├── utils/         # cleaning.py (normalize_whitespace, remove_markup), markdown.py (strip_formatting)
 │   │   ├── server/        # server.py (endpoints + lifespan), models.py (Pydantic schemas), registry.py
 │   │   └── config.py      # paths, logging, crawler and service settings (env-overridable)
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/              # FastAPI + Jinja2 + httpx (minimal stateless UI)
-├── gs_data/               # gold-standard datasets (one JSON per domain)
+├── gs_data/               # gold-standard datasets and precomputed evaluation records
 ├── domains.json           # supported domains
 └── docker-compose.yaml
 ```
@@ -136,11 +144,19 @@ Once the containers are running:
 - Web UI → http://localhost:8004
 - Backend API (Swagger) → http://localhost:8003/docs
 
-The whole stack is containerized: Compose starts MariaDB first, waits for its health check, and then starts the backend and frontend. The backend installs Playwright/Chromium at build time, so no local Python, database or browser setup is needed.
+The whole stack is containerized: Compose starts MariaDB and Ollama first, waits for both health checks, and then starts the backend and frontend. On the first run Ollama downloads `qwen3:4b` (about 2.5 GB), so startup takes longer. The backend installs Playwright/Chromium at build time, so no local Python, database, model runtime or browser setup is needed.
+
+To deliberately regenerate all persisted source records after changing a parser or the Judge prompt:
+
+```bash
+docker compose run --rm --no-deps backend python -m src.tools.generate_precomputed_results
+```
+
+Run this only while Ollama is healthy. The generator writes atomically and refuses to publish a partial batch or a Judge fallback.
 
 ## Tech stack
 
-`Python 3.11` · `FastAPI` · `MariaDB 11.4` · `Crawl4AI` · `Playwright` · `Pydantic` · `sacrebleu` · `BeautifulSoup` · `httpx` · `Jinja2` · `Docker Compose`
+`Python 3.11` · `FastAPI` · `MariaDB 11.4` · `Ollama` · `qwen3:4b` · `Crawl4AI` · `Playwright` · `Pydantic` · `sacrebleu` · `BeautifulSoup` · `httpx` · `Jinja2` · `Docker Compose`
 
 ## Contributors
 
