@@ -4,6 +4,8 @@ from ..database import get_connection
 _REQUIRED_TABLES = (
     "web_resources",
     "gold_standard",
+    "evaluation_results",
+    "judge_results",
 )
 
 
@@ -24,7 +26,7 @@ def get_schema() -> dict[str, dict[str, str]]:
             FROM information_schema.KEY_COLUMN_USAGE
             WHERE TABLE_SCHEMA = DATABASE()
                 AND REFERENCED_TABLE_NAME IS NOT NULL
-                AND TABLE_NAME IN (?, ?)
+                AND TABLE_NAME IN (?, ?, ?, ?)
             """,
             _REQUIRED_TABLES,
         )
@@ -50,7 +52,7 @@ def get_schema() -> dict[str, dict[str, str]]:
                 COLUMN_KEY
             FROM information_schema.COLUMNS
             WHERE TABLE_SCHEMA = DATABASE()
-                AND TABLE_NAME IN (?, ?)
+                AND TABLE_NAME IN (?, ?, ?, ?)
             ORDER BY
                 TABLE_NAME,
                 ORDINAL_POSITION

@@ -14,6 +14,7 @@ GS_DATA_DIR: Path = (
     if _gs_data_dir.is_absolute()
     else _PROJECT_ROOT / _gs_data_dir
 )
+PRECOMPUTED_RESULTS_FILE: Path = GS_DATA_DIR / "precomputed_results.json"
 
 # configurazione logging
 LOGGER_NAME: str = "minerva-parser"
