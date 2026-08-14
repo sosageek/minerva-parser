@@ -13,6 +13,10 @@ _RE_TABLE_ROW   = re.compile(r'^\|.*\|\s*$', re.MULTILINE)
 _RE_TABLE_SEP   = re.compile(r'^[|:\-\s]+$', re.MULTILINE)
 
 _RE_HTML_TAG    = re.compile(r'<(?:!--.*?--|/?[a-zA-Z][^<>]*)>', re.DOTALL)
+_RE_CITATION    = re.compile(
+    r'\[(?:\d+(?:\s*[,\-–]\s*\d+)*|citation needed)\]',
+    re.IGNORECASE,
+)
 _RE_STRAY_BR    = re.compile(r'(?<!\[)\]|\[(?!\])')
 
 _RE_SPACE_PUNCT = re.compile(r'[ \t]+([.,;:!?)\]])')
@@ -43,6 +47,7 @@ def remove_markup(text: str) -> str:
     text = _RE_TABLE_ROW.sub('', text)
     text = _RE_TABLE_SEP.sub('', text)
     text = _RE_HTML_TAG.sub('', text)
+    text = _RE_CITATION.sub('', text)
     text = html.unescape(text)
     text = _RE_STRAY_BR.sub('', text)
     return text
