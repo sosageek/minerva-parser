@@ -89,7 +89,15 @@ def judge(parsed_text: str, gold_text: str, model: str = OLLAMA_MODEL) -> JudgeR
     Returns:
         ``JudgeResult`` sempre conforme, con punteggio intero fra 1 e 5
     """
-    prompt = build_prompt(strip_formatting(parsed_text), strip_formatting(gold_text))
+    try:
+        prompt = build_prompt(strip_formatting(parsed_text), strip_formatting(gold_text))
+    except Exception as err:
+        logger.exception("preparazione del prompt Judge fallita")
+        return _fallback(
+            model,
+            f"error:{type(err).__name__}",
+            "Judge unavailable, neutral score assigned.",
+        )
 
     for attempt, (suffix, diagnostics) in enumerate(
         (("", "ok"), (REPAIR_SUFFIX, "repaired")), start=1
@@ -98,6 +106,13 @@ def judge(parsed_text: str, gold_text: str, model: str = OLLAMA_MODEL) -> JudgeR
             raw, elapsed = generate(prompt + suffix, model)
         except OllamaError as err:
             return _fallback(model, f"error:{err}", "Judge unavailable, neutral score assigned.")
+        except Exception as err:
+            logger.exception("errore inatteso del client Judge")
+            return _fallback(
+                model,
+                f"error:{type(err).__name__}",
+                "Judge unavailable, neutral score assigned.",
+            )
 
         data = _extract_json(raw)
         if data is not None:

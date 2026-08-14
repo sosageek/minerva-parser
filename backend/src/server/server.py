@@ -1,5 +1,4 @@
 import asyncio
-import http.client
 import logging
 from collections.abc import Callable
 from contextlib import asynccontextmanager
@@ -9,24 +8,25 @@ import mariadb
 from bs4 import BeautifulSoup
 from fastapi import FastAPI, HTTPException, Query
 
-from ..config import (
-    OLLAMA_URL,
-    STATUS_CHECK_TIMEOUT,
-    configure_logging,
-)
+from ..config import STATUS_CHECK_TIMEOUT, configure_logging
 from ..db import (
     close_pool,
     create_pool,
     initialize_schema,
     ping_database,
     seed_gold_standards,
+    seed_precomputed_results,
 )
 from ..db.repositories import (
+    evaluation_results as evaluation_repository,
     gold_standard as gold_standard_repository,
-    web_resources as web_resource_repository,
+    judge_results as judge_repository,
     metadata as metadata_repository,
+    web_resources as web_resource_repository,
 )
 from ..eval import ChrFEvaluator, RougeOneEvaluator, TokenLevelEvaluator
+from ..judge import is_available as judge_is_available
+from ..judge import judge
 from ..parsers import CrawlError, ParsedDocument, Parser
 from ..parsers._crawler import close_crawler
 from ..utils import strip_formatting
@@ -35,9 +35,11 @@ from .models import (
     DBSchema,
     DBStats,
     EvaluationInput,
+    FullParseEvaluation,
     GoldStandardInput,
     GoldStandardURLs,
     GSEntry,
+    JudgeEvaluation,
     ListGSEntry,
     ParseEvaluation,
     ParseInput,
@@ -75,6 +77,7 @@ async def lifespan(app: FastAPI):
         create_pool()
         initialize_schema()
         seed_gold_standards()
+        seed_precomputed_results()
 
         yield
 
@@ -248,30 +251,9 @@ def _database_is_available() -> bool:
 
 
 def _ollama_is_available() -> bool:
-    """Verifica l'API di Ollama senza richiedere che un modello sia già caricato"""
+    """Verifica l'API di Ollama tramite il probe del componente Judge."""
 
-    parsed_url = urlparse(OLLAMA_URL)
-    if parsed_url.scheme not in ("http", "https") or not parsed_url.hostname:
-        return False
-
-    connection_class = (
-        http.client.HTTPSConnection
-        if parsed_url.scheme == "https"
-        else http.client.HTTPConnection
-    )
-    connection = connection_class(
-        parsed_url.hostname,
-        parsed_url.port,
-        timeout=STATUS_CHECK_TIMEOUT,
-    )
-    base_path = parsed_url.path.rstrip("/")
-    try:
-        connection.request("GET", f"{base_path}/api/tags")
-        response = connection.getresponse()
-        response.read()
-        return 200 <= response.status < 300
-    finally:
-        connection.close()
+    return judge_is_available(timeout=STATUS_CHECK_TIMEOUT)
 
 
 def _service_status(
@@ -281,10 +263,10 @@ def _service_status(
     """Converte ogni errore del probe nello stato degradato previsto dal contratto"""
 
     try:
-        return "ok" if check() else "unavailable"
+        return "ok" if check() else "error"
     except Exception as err:
         logger.warning("status check %s fallito: %s", service_name, err)
-        return "unavailable"
+        return "error"
 
 
 # ---------------------------------- API  ----------------------------------
@@ -328,10 +310,14 @@ def db_stats() -> DBStats:
 
     web_resources = web_resource_repository.count_by_domain()
     gold_standard = gold_standard_repository.count_by_domain()
+    avg_eval = evaluation_repository.averages_by_domain()
+    avg_eval_judge = judge_repository.averages_by_domain()
 
     return DBStats(
         web_resources=web_resources,
         gold_standard=gold_standard,
+        avg_eval=avg_eval,
+        avg_eval_judge=avg_eval_judge,
     )
 
 
@@ -623,90 +609,45 @@ def evaluate(payload: EvaluationInput) -> ParseEvaluation:
     return _do_evaluate(payload.parsed_text, payload.gold_text)
 
 
-@app.get("/full_gs_eval", response_model=ParseEvaluation)
+@app.post("/evaluate_judge", response_model=JudgeEvaluation)
+async def evaluate_judge(payload: EvaluationInput) -> JudgeEvaluation:
+    """Valuta una coppia parsed/gold con il componente LLM-as-a-Judge."""
+
+    result = await asyncio.to_thread(judge, payload.parsed_text, payload.gold_text)
+    return JudgeEvaluation(
+        model_name=result.model_name,
+        judge_score=result.judge_score,
+        judge_feedback=result.judge_feedback,
+        extra_noise=result.extra_noise,
+        prompt_version=result.prompt_version,
+    )
+
+
+@app.get("/full_gs_eval", response_model=FullParseEvaluation)
 async def full_gs_eval(
     domain: str = Query(..., description="Dominio su cui aggregare la valutazione"),
-) -> ParseEvaluation:
-    """Evaluation aggregata su tutto il GS del dominio
-
-    * esegue il parsing con ``_do_parse``
-    * valuta ``parsed_text`` vs ``gold_text`` con ``_do_evaluate``
-
-    Poi media precision, recall e f1 sulle singole valutazioni.
-
-    Returns:
-        ``ParseEvaluation`` con la media delle evaluation effettuate su tutti i domini dove va a buon fine
-
-    nota: se alcuni, ma non tutti, i domini falliscono al crawl si ha in output evaluation aggregata
-    solo rispetto ai domini che l'hanno completata con successo
-
-    Raises:
-        HTTPException(400): dominio non supportato
-        HTTPException(502): se tutti gli URL del GS falliscono al crawl
-    """
+) -> FullParseEvaluation:
+    """Restituisce metriche e Judge aggregati dai risultati precalcolati."""
 
     _require_supported_domain(domain)
-    entries = await asyncio.to_thread(
-        gold_standard_repository.list_by_domain,
-        domain,
+    entries = await asyncio.to_thread(gold_standard_repository.list_by_domain, domain)
+    eval_by_domain, judge_by_domain = await asyncio.gather(
+        asyncio.to_thread(evaluation_repository.averages_by_domain),
+        asyncio.to_thread(judge_repository.averages_by_domain),
     )
-
-    precisions: list[float] = []
-    recalls: list[float] = []
-    f1s: list[float] = []
-    chrfs: list[float] = []
-    noise_ratios: list[float] = []
-    rouge_1_ps: list[float] = []
-    rouge_1_rs: list[float] = []
-    rouge_1_f1s: list[float] = []
-    failed: list[str] = []
-
-    for entry in entries:
-        url = entry["url"]
-        html_text = entry.get("html_text")
-        try:
-            doc = await _do_parse(url, html_text)
-        except HTTPException as err:
-            logger.warning("full_gs_eval: skip %s (%s)", url, err.detail)
-            failed.append(url)
-            continue
-
-        parsed_clean = _prepare_for_eval(doc.parsed_text)
-        gold_clean = _prepare_for_eval(entry["gold_text"])
-        metrics = _evaluator.evaluate(parsed_clean, gold_clean)
-        precisions.append(metrics["precision"])
-        recalls.append(metrics["recall"])
-        f1s.append(metrics["f1"])
-        chrfs.append(_chrf.evaluate(parsed_clean, gold_clean))
-        noise_ratios.append(_evaluator.noise_ratio(parsed_clean, gold_clean))
-        r1 = _rouge1.evaluate(parsed_clean, gold_clean)
-        rouge_1_ps.append(r1["precision"])
-        rouge_1_rs.append(r1["recall"])
-        rouge_1_f1s.append(r1["f1"])
-
-    if not precisions:
+    persisted_eval = eval_by_domain.get(domain)
+    persisted_judge = judge_by_domain.get(domain)
+    if persisted_eval is None or persisted_judge is None:
         raise HTTPException(
-            status_code=502,
-            detail=f"all {len(entries)} URLs in gold standard for {domain} failed to parse",
+            status_code=503,
+            detail=f"precomputed evaluation unavailable for domain {domain}",
         )
 
-    n = len(precisions)
-    aggregated = TokenLevelEval(
-        precision=round(sum(precisions) / n, 4),
-        recall=round(sum(recalls) / n, 4),
-        f1=round(sum(f1s) / n, 4),
+    token_eval = persisted_eval["token_level_eval"]
+    x_eval = dict(persisted_eval["x_eval"])
+    x_eval["n_total"] = len(entries)
+    return FullParseEvaluation(
+        token_level_eval=TokenLevelEval(**token_eval),
+        x_eval=x_eval,
+        judge_score=float(persisted_judge["judge_score"]),
     )
-    x_eval: dict = {
-        "n_evaluated": n,
-        "n_total": len(entries),
-        "chrf": round(sum(chrfs) / n, 4),
-        "noise_ratio": round(sum(noise_ratios) / n, 4),
-        "rouge_1": {
-            "precision": round(sum(rouge_1_ps) / n, 4),
-            "recall": round(sum(rouge_1_rs) / n, 4),
-            "f1": round(sum(rouge_1_f1s) / n, 4),
-        },
-    }
-    if failed:
-        x_eval["failed_urls"] = failed
-    return ParseEvaluation(token_level_eval=aggregated, x_eval=x_eval)

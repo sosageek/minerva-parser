@@ -34,7 +34,10 @@ def _post(payload: dict, timeout: float) -> dict:
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=timeout) as response:
-        return json.loads(response.read().decode("utf-8"))
+        body = json.loads(response.read().decode("utf-8"))
+    if not isinstance(body, dict):
+        raise ValueError("Ollama response is not a JSON object")
+    return body
 
 
 def generate(
@@ -78,7 +81,13 @@ def generate(
                 body = _post(payload, timeout)
         else:
             body = _post(payload, timeout)
-    except (urllib.error.URLError, TimeoutError, OSError) as err:
+    except (
+        json.JSONDecodeError,
+        urllib.error.URLError,
+        TimeoutError,
+        OSError,
+        ValueError,
+    ) as err:
         raise OllamaError(type(err).__name__) from err
     elapsed = time.perf_counter() - started
 

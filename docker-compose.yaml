@@ -71,14 +71,17 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
         ollama serve &
         pid=$$!
         until ollama list >/dev/null 2>&1; do sleep 1; done
-        ollama pull "$$OLLAMA_MODEL" || echo "pull fallito"
+        ollama pull "$$OLLAMA_MODEL"
+        ollama run "$$OLLAMA_MODEL" --think=false \
+          "Reply with only OK." >/dev/null
         wait $$pid
-    # healthy solo a modello scaricato, il backend non deve partire prima
+    # healthy solo a modello caricato in RAM, non soltanto scaricato
     healthcheck:
-      test: ["CMD-SHELL", "ollama list | grep -q $$OLLAMA_MODEL"]
+      test: ["CMD-SHELL", "ollama ps | grep -Fq $$OLLAMA_MODEL"]
       start_period: 60s
       interval: 10s
       timeout: 10s

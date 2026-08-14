@@ -24,9 +24,9 @@ class JudgeResult(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
     model_name: str
-    judge_score: int = Field(ge=1, le=5)
-    judge_feedback: str = ""
-    extra_noise: str = ""
+    judge_score: int = Field(strict=True, ge=1, le=5)
+    judge_feedback: str = Field(default="", max_length=500)
+    extra_noise: str = Field(default="", max_length=300)
     diagnostics: str = "ok"
     prompt_version: str = PROMPT_VERSION
     latency_s: float | None = None

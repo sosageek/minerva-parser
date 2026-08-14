@@ -2,7 +2,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
 
-ServiceStatus = Literal["ok", "unavailable"]
+ServiceStatus = Literal["ok", "error"]
 
 
 class StatusOutput(BaseModel):
@@ -199,6 +199,18 @@ class EvaluationInput(BaseModel):
     gold_text: str
 
 
+class JudgeEvaluation(BaseModel):
+    """Risposta pubblica di POST /evaluate_judge."""
+
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    model_name: str
+    judge_score: int = Field(strict=True, ge=1, le=5)
+    judge_feedback: str
+    extra_noise: str = ""
+    prompt_version: str
+
+
 class TokenLevelEval(BaseModel):
     """Metriche token-level (precision, recall, f1)
 
@@ -232,3 +244,9 @@ class ParseEvaluation(BaseModel):
 
     token_level_eval: TokenLevelEval
     x_eval: dict[str, Any] = Field(default_factory=dict)
+
+
+class FullParseEvaluation(ParseEvaluation):
+    """Evaluation aggregata, comprensiva del Judge precalcolato."""
+
+    judge_score: float = Field(ge=1, le=5)
