@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Minerva Parser{% endblock %}</title>
+  <link rel="icon" type="image/png" href="/static/minerva.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+
+<nav class="navbar">
+  <div class="navbar__inner">
+    <a class="navbar__brand" href="/">
+      <img src="/static/minerva.png" alt="Minerva NLP" class="navbar__logo">
+      Minerva Parser
+    </a>
+    <div class="navbar__links">
+      <a class="navbar__link{% if active_page == 'home' %} is-active{% endif %}" href="/">Home</a>
+      <a class="navbar__link{% if active_page == 'parser' %} is-active{% endif %}" href="/parser">Parser &amp; Evaluation</a>
+      <a class="navbar__link{% if active_page == 'gold_standard' %} is-active{% endif %}" href="/gold-standard">Gold Standard Builder</a>
+      <a class="navbar__link{% if active_page == 'stats' %} is-active{% endif %}" href="/stats">Stats</a>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+  {% block content %}{% endblock %}
+  <footer class="credits"><b>Cillo · Lobello · Mazzocco</b></footer>
+</div>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

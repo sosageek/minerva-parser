@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Minerva Parser Parser & Evaluation{% endblock %}
+
+{% block content %}
+
+{% macro metric(lbl, v, sub='') %}
+<li class="metric">
+  <span class="metric__label">{{ lbl }}{% if sub %}<small>{{ sub }}</small>{% endif %}</span>
+  <span class="metric__value">{{ "%.3f"|format(v) }}</span>
+  <div class="metric__bar"><span style="width: {{ (v * 100)|round(1) }}%"></span></div>
+</li>
+{% endmacro %}
+
+<div class="layout">
+
+  <section class="layout__panel layout__panel--full">
+    <p class="eyebrow">Input</p>
+    <form class="search" method="get" action="/parser" id="parse-form">
+      <input class="search__input" type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
+      <div class="radio-group">
+        <label><input type="radio" name="mode" value="live" {% if mode != 'local' %}checked{% endif %}> Live</label>
+        <label><input type="radio" name="mode" value="local" {% if mode == 'local' %}checked{% endif %}> Local</label>
+      </div>
+      <button class="btn btn--primary" type="submit" id="parse-btn">Parse</button>
+    </form>
+    <p class="hint">
+      <b>Live</b> scarica la pagina dal web e salva/aggiorna la risorsa nel database.
+      <b>Local</b> legge esclusivamente l'HTML già salvato per quella URL, senza rete
+      (fallisce con "not in database" se la URL non è mai stata acquisita).
+    </p>
+
+    {% if domains %}
+    <div class="gs-picker">
+      <span class="gs-picker__hint">oppure dal gold standard (letto in modalità Local)</span>
+      <select class="gs-picker__select" id="gs-domain">
+        <option value="">— dominio —</option>
+        {% for d in domains %}<option value="{{ d }}">{{ d }}</option>{% endfor %}
+      </select>
+      <select class="gs-picker__select" id="gs-url" disabled><option value="">— url —</option></select>
+      <button class="btn btn--outline" type="button" id="gs-go" disabled>Parse dal GS</button>
+    </div>
+    {% else %}
+    <div class="gs-picker"><span class="gs-picker__hint">backend non raggiumgibile.</span></div>
+    {% endif %}
+  </section>
+
+  {% if error %}
+  <section class="layout__panel layout__panel--error"><b>Errore:</b> {{ error }}</section>
+  {% endif %}
+
+  {% if parse_result %}
+  <section class="layout__panel layout__panel--meta">
+    <div class="meta">
+      <div class="meta__badges">
+        <span class="meta__badge">{{ parse_result.domain }}</span>
+        <span class="meta__badge">{{ 'live' if mode != 'local' else 'local' }}</span>
+      </div>
+      <div class="meta__list">
+        <div class="meta__row"><b>URL</b>{{ parse_result.url }}</div>
+        <div class="meta__row"><b>Titolo</b>{{ parse_result.title }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="layout__panel layout__panel--html">
+    <details>
+      <summary class="html-toggle">html text <span class="html-toggle__hint">clicca per espandere</span></summary>
+      <pre class="html-pre">{{ parse_result.html_text }}</pre>
+    </details>
+  </section>
+
+  <section class="layout__panel layout__panel--parsed{% if not gs_entry %} is-full{% endif %}">
+    <div class="panel-head"><h3>parsed text</h3></div>
+    <div class="text-body">{{ parse_result.parsed_text }}</div>
+  </section>
+
+  {% if gs_entry %}
+  <section class="layout__panel layout__panel--gold">
+    <div class="panel-head"><h3>gold text</h3></div>
+    <div class="text-body">{{ gs_entry.gold_text }}</div>
+  </section>
+  {% else %}
+  <section class="layout__panel layout__panel--full">
+    <p class="hint">Nessuna entry Gold Standard per questa URL: mostro solo il parsing, senza metriche.</p>
+  </section>
+  {% endif %}
+
+  {% if evaluation %}
+  {% set tk = evaluation.token_level_eval %}
+  <section class="layout__panel layout__panel--metric">
+    <div class="panel-head"><h3>token-level</h3></div>
+    <ul class="metric-list">
+      {{ metric('precision', tk.precision) }}
+      {{ metric('recall',    tk.recall) }}
+      {{ metric('f1',        tk.f1) }}
+    </ul>
+  </section>
+
+  {% if evaluation.x_eval.rouge_1 %}
+  {% set r1 = evaluation.x_eval.rouge_1 %}
+  <section class="layout__panel layout__panel--metric is-rouge">
+    <div class="panel-head"><h3>rouge-1</h3></div>
+    <ul class="metric-list">
+      {{ metric('precision', r1.precision) }}
+      {{ metric('recall',    r1.recall) }}
+      {{ metric('f1',        r1.f1) }}
+    </ul>
+  </section>
+  {% endif %}
+
+  <section class="layout__panel layout__panel--metric is-extra">
+    <ul class="metric-list">
+      {% if evaluation.x_eval.chrf is defined %}
+        {{ metric('chrF', evaluation.x_eval.chrf, 'sovrapposizione caratteri') }}
+      {% endif %}
+      {% if evaluation.x_eval.noise_ratio is defined %}
+        {{ metric('noise', evaluation.x_eval.noise_ratio, '1 - precision') }}
+      {% endif %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if gs_entry %}
+  <section class="layout__panel layout__panel--metric is-judge">
+    <div class="panel-head"><h3>LLM-as-a-Judge</h3><span class="panel-head__tag">POST /evaluate_judge</span></div>
+    {% if judge %}
+    <div class="judge-score">
+      <span class="judge-score__value">{{ judge.judge_score }}</span>
+      <span class="judge-score__max">/ 5</span>
+    </div>
+    <p class="judge-feedback">{{ judge.judge_feedback }}</p>
+    {% if judge.extra_noise %}<p class="hint"><b>Rumore rilevato:</b> {{ judge.extra_noise }}</p>{% endif %}
+    <p class="judge-model">{{ judge.model_name }}  prompt {{ judge.prompt_version }}</p>
+    {% else %}
+    <p class="hint">Giudizio non disponibile{% if judge_error %}: {{ judge_error }}{% endif %}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if domains %}
+  // Popola selettore URL in base al dominio
+  const gsUrls = {{ gs_urls | tojson }};
+  const dom = document.getElementById("gs-domain");
+  const urlSelect = document.getElementById("gs-url");
+  const go = document.getElementById("gs-go");
+
+  dom.onchange = () => {
+  urlSelect.innerHTML = '<option value="">— url —</option>';
+  const urls = gsUrls[dom.value] || [];
+  urls.forEach(u => urlSelect.add(new Option(u, u)));
+  urlSelect.disabled = urls.length === 0;
+  go.disabled = true;
+};
+  urlSelect.onchange = () => { go.disabled = !urlSelect.value; };
+  go.onclick = () => {
+    if (urlSelect.value) {
+      location.href = "/parser?url=" + encodeURIComponent(urlSelect.value) + "&mode=local";
+    }
+  };
+{% endif %}
+
+  // Evita doppio submit
+  document.getElementById("parse-form").addEventListener("submit", () => {
+    document.getElementById("parse-btn").disabled = true;
+  });
+</script>
+{% endblock %}

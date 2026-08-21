@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Minerva Parser · Gold Standard Builder{% endblock %}
+
+{% block content %}
+<div class="layout">
+
+  <section class="layout__panel layout__panel--full">
+    <p class="eyebrow">1 · Acquisisci una pagina</p>
+    <form class="search" method="get" action="/gold-standard" id="fetch-form">
+      <input class="search__input" type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
+      <div class="radio-group">
+        <label><input type="radio" name="mode" value="live" {% if mode != 'local' %}checked{% endif %}> Live</label>
+        <label><input type="radio" name="mode" value="local" {% if mode == 'local' %}checked{% endif %}> Local</label>
+      </div>
+      <button class="btn btn--primary" type="submit" id="fetch-btn">Acquisisci</button>
+    </form>
+    <p class="hint">
+      <b>Live</b> scarica la pagina e la salva come web resource nel database (necessario la prima volta).
+      <b>Local</b> rilegge l'HTML già salvato, senza rete, utile per rivedere/correggere un gold text già creato.
+    </p>
+  </section>
+
+  {% if fetch_error %}
+  <section class="layout__panel layout__panel--error"><b>Errore:</b> {{ fetch_error }}</section>
+  {% endif %}
+
+  {% if save_status %}
+  <section class="layout__panel layout__panel--{{ 'success' if save_status.status == 'ok' else 'error' }}">
+    {% if save_status.status == 'ok' %}Gold text salvato per <b>{{ save_status.url }}</b>.{% else %}Salvataggio fallito per <b>{{ save_status.url }}</b>: verifica che la web resource esista.{% endif %}
+  </section>
+  {% endif %}
+
+  {% if fetch_result %}
+  <section class="layout__panel layout__panel--meta">
+    <div class="meta">
+      <div class="meta__badges"><span class="meta__badge">{{ fetch_result.domain }}</span></div>
+      <div class="meta__list">
+        <div class="meta__row"><b>URL</b>{{ fetch_result.url }}</div>
+        <div class="meta__row"><b>Titolo</b>{{ fetch_result.title }}</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="layout__panel layout__panel--html">
+    <details>
+      <summary class="html-toggle">html text <span class="html-toggle__hint">clicca per espandere · scaricabile sotto</span></summary>
+      <pre class="html-pre" id="html-source">{{ fetch_result.html_text }}</pre>
+    </details>
+    <button class="btn btn--outline section-gap" type="button" id="download-html">Scarica come file .html</button>
+  </section>
+
+  <section class="layout__panel layout__panel--parsed">
+    <div class="panel-head"><h3>parsed text</h3><span class="panel-head__tag">punto di partenza suggerito</span></div>
+    <div class="text-body">{{ fetch_result.parsed_text }}</div>
+  </section>
+
+  <section class="layout__panel layout__panel--gold">
+    <p class="eyebrow">2 · Gold text</p>
+    <form method="post" action="/gold-standard/save">
+      <input type="hidden" name="url" value="{{ fetch_result.url }}">
+      <label class="field-label" for="gold_text">testo di riferimento (plain text, senza markdown)</label>
+      <textarea class="search__input" id="gold_text" name="gold_text" required>{{ existing_gold.gold_text if existing_gold else fetch_result.parsed_text }}</textarea>
+      <p class="hint">
+        {% if existing_gold %}Esiste già un Gold Standard per questa URL: il testo qui sopra è quello salvato, puoi correggerlo.
+        {% else %}Nessun Gold Standard esistente: come punto di partenza è precompilato il parsed text, da ripulire a mano.{% endif %}
+      </p>
+      <button class="btn btn--primary section-gap" type="submit">Salva Gold Standard</button>
+    </form>
+  </section>
+  {% endif %}
+
+  <section class="layout__panel layout__panel--full">
+    <p class="eyebrow">3 · Elimina</p>
+    <div class="layout" style="gap:16px;">
+      <div class="layout__panel--half" style="grid-column: span 6;">
+        <form method="post" action="/gold-standard/delete-gs" onsubmit="return confirm('Eliminare solo il Gold Standard per questa URL? La web resource resta.');">
+          <label class="field-label" for="delete_gs_url">elimina solo il Gold Standard</label>
+          <div class="search">
+            <input class="search__input" type="text" id="delete_gs_url" name="url" placeholder="https://..." required>
+            <button class="btn btn--danger" type="submit">Elimina GS</button>
+          </div>
+        </form>
+      </div>
+      <div class="layout__panel--half" style="grid-column: span 6;">
+        <form method="post" action="/gold-standard/delete-resource" onsubmit="return confirm('Eliminare la web resource? Il Gold Standard collegato viene cancellato a cascata.');">
+          <label class="field-label" for="delete_resource_url">elimina web resource (+ GS a cascata)</label>
+          <div class="search">
+            <input class="search__input" type="text" id="delete_resource_url" name="url" placeholder="https://..." required>
+            <button class="btn btn--danger" type="submit">Elimina risorsa</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% if delete_status %}
+    <p class="hint section-gap">
+      {% if delete_status.status == 'ok' %}
+        Eliminazione riuscita per <b>{{ delete_status.url }}</b> ({{ delete_status.kind }}).
+      {% else %}
+        Eliminazione fallita per <b>{{ delete_status.url }}</b>: elemento non trovato o errore del database.
+      {% endif %}
+    </p>
+    {% endif %}
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if fetch_result %}
+  document.getElementById("download-html").addEventListener("click", () => {
+    const html = document.getElementById("html-source").textContent;
+    const blob = new Blob([html], { type: "text/html" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = {{ (fetch_result.domain + ".html") | tojson }};
+    link.click();
+    URL.revokeObjectURL(link.href);
+  });
+{% endif %}
+
+  document.getElementById("fetch-form").addEventListener("submit", () => {
+    document.getElementById("fetch-btn").disabled = true;
+  });
+</script>
+{% endblock %}

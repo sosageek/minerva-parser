@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Minerva Parser · Stats{% endblock %}
+
+{% block content %}
+<div class="layout">
+
+  {% if stats_error %}
+  <section class="layout__panel layout__panel--error"><b>Errore:</b> {{ stats_error }}</section>
+  {% else %}
+  <section class="layout__panel layout__panel--full">
+    <div class="panel-head"><h3>Conteggi e metriche medie per dominio</h3><span class="panel-head__tag">GET /db_stats</span></div>
+    <div style="overflow-x:auto;">
+    <table class="stats-table">
+      <thead>
+        <tr>
+          <th>dominio</th>
+          <th>web resources</th>
+          <th>gold standard</th>
+          <th>f1 (token-level)</th>
+          <th>chrF</th>
+          <th>noise</th>
+          <th>rouge-1 f1</th>
+          <th>judge</th>
+          <th>n. valutati</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in domains %}
+        {% set ev = stats.avg_eval.get(d) if stats.avg_eval else None %}
+        {% set jd = stats.avg_eval_judge.get(d) if stats.avg_eval_judge else None %}
+        <tr>
+          <td>{{ d }}</td>
+          <td>{{ stats.web_resources.get(d, 0) }}</td>
+          <td>{{ stats.gold_standard.get(d, 0) }}</td>
+          <td>{% if ev %}{{ "%.3f"|format(ev.token_level_eval.f1) }}{% else %}<span class="na">n/d</span>{% endif %}</td>
+          <td>{% if ev and ev.x_eval.chrf is defined %}{{ "%.3f"|format(ev.x_eval.chrf) }}{% else %}<span class="na">n/d</span>{% endif %}</td>
+          <td>{% if ev and ev.x_eval.noise_ratio is defined %}{{ "%.3f"|format(ev.x_eval.noise_ratio) }}{% else %}<span class="na">n/d</span>{% endif %}</td>
+          <td>{% if ev and ev.x_eval.rouge_1 %}{{ "%.3f"|format(ev.x_eval.rouge_1.f1) }}{% else %}<span class="na">n/d</span>{% endif %}</td>
+          <td>{% if jd %}{{ "%.2f"|format(jd.judge_score) }} / 5{% else %}<span class="na">n/d</span>{% endif %}</td>
+          <td>{% if jd %}{{ jd.n_evaluated }}{% elif ev and ev.x_eval.n_evaluated is defined %}{{ ev.x_eval.n_evaluated }}{% else %}<span class="na">0</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="hint">"n/d" = nessun risultato ancora persistito per quel dominio in <code>evaluation_results</code> / <code>judge_results</code>.</p>
+  </section>
+  {% endif %}
+
+</div>
+{% endblock %}
