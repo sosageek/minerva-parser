@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 from collections.abc import Callable
 from contextlib import asynccontextmanager
@@ -25,6 +26,7 @@ from ..db.repositories import (
     web_resources as web_resource_repository,
 )
 from ..eval import ChrFEvaluator, RougeOneEvaluator, TokenLevelEvaluator
+from ..judge import JudgeResult
 from ..judge import is_available as judge_is_available
 from ..judge import judge
 from ..parsers import CrawlError, ParsedDocument, Parser
@@ -60,6 +62,10 @@ logger = logging.getLogger("minerva-parser.api")
 _evaluator = TokenLevelEvaluator()
 _chrf = ChrFEvaluator()
 _rouge1 = RougeOneEvaluator()
+
+# il tester batte full_gs_eval nove volte su quattro domini, le entry distinte sono 41 ma
+# le inferenze sarebbero 92, e a temperature 0 lo stesso input ridà sempre lo stesso voto
+_judge_cache: dict[str, JudgeResult] = {}
 
 
 @asynccontextmanager
@@ -242,6 +248,50 @@ def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
         token_level_eval=TokenLevelEval(**token_metrics),
         x_eval=x_eval,
     )
+
+
+def _judge_key(parsed_text: str, gold_text: str) -> str:
+    """Chiave di cache di una coppia (parsed, gold)
+
+    sul contenuto e non sull'url perché i test automatici riscrivono html_text con
+    /add_web_resource, quindi lo stesso url può dare un parsed_text diverso da una chiamata
+    all'altra e ci ritroveremmo a servire un giudizio calcolato su un testo che non esiste
+    più. hashando i due testi, se il testo cambia cambia la chiave e si rigiudica
+
+    Returns:
+        digest esadecimale dei due testi
+    """
+
+    digest = hashlib.sha256()
+    # separatore esplicito, senza coppie diverse collassano sulla stessa concatenazione
+    digest.update(parsed_text.encode())
+    digest.update(b"\x00")
+    digest.update(gold_text.encode())
+    return digest.hexdigest()
+
+
+def _judge_cached(parsed_text: str, gold_text: str) -> JudgeResult:
+    """Giudizio del judge, riusato se quella coppia è già passata di qui
+
+    la cache vive solo in memoria di processo, al riavvio del container si riparte da zero
+
+    Returns:
+        ``JudgeResult``, dalla cache oppure appena calcolato
+    """
+
+    key = _judge_key(parsed_text, gold_text)
+    cached = _judge_cache.get(key)
+    if cached is not None:
+        return cached
+
+    result = judge(parsed_text, gold_text)
+
+    # i fallback sono punteggi neutri, non giudizi: se ollama era giù per un attimo e li
+    # cachiamo ce li teniamo fino al riavvio anche dopo che è tornato su
+    if result.diagnostics in ("ok", "repaired"):
+        _judge_cache[key] = result
+
+    return result
 
 
 def _mean(values: list[float]) -> float:
@@ -673,7 +723,7 @@ async def full_gs_eval(
             continue
 
         evaluations.append(_do_evaluate(doc.parsed_text, entry["gold_text"]))
-        verdict = await asyncio.to_thread(judge, doc.parsed_text, entry["gold_text"])
+        verdict = await asyncio.to_thread(_judge_cached, doc.parsed_text, entry["gold_text"])
         judge_scores.append(verdict.judge_score)
 
     if not evaluations or not judge_scores:
