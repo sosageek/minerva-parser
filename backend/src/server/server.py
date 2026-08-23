@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import logging
 from collections.abc import Callable
 from contextlib import asynccontextmanager
@@ -25,6 +26,7 @@ from ..db.repositories import (
     web_resources as web_resource_repository,
 )
 from ..eval import ChrFEvaluator, RougeOneEvaluator, TokenLevelEvaluator
+from ..judge import JudgeResult
 from ..judge import is_available as judge_is_available
 from ..judge import judge
 from ..parsers import CrawlError, ParsedDocument, Parser
@@ -60,6 +62,10 @@ logger = logging.getLogger("minerva-parser.api")
 _evaluator = TokenLevelEvaluator()
 _chrf = ChrFEvaluator()
 _rouge1 = RougeOneEvaluator()
+
+# il tester batte full_gs_eval nove volte su quattro domini, le entry distinte sono 41 ma
+# le inferenze sarebbero 92, e a temperature 0 lo stesso input ridà sempre lo stesso voto
+_judge_cache: dict[str, JudgeResult] = {}
 
 
 @asynccontextmanager
@@ -242,6 +248,56 @@ def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
         token_level_eval=TokenLevelEval(**token_metrics),
         x_eval=x_eval,
     )
+
+
+def _judge_key(parsed_text: str, gold_text: str) -> str:
+    """Chiave di cache di una coppia (parsed, gold)
+
+    sul contenuto e non sull'url perché i test automatici riscrivono html_text con
+    /add_web_resource, quindi lo stesso url può dare un parsed_text diverso da una chiamata
+    all'altra e ci ritroveremmo a servire un giudizio calcolato su un testo che non esiste
+    più. hashando i due testi, se il testo cambia cambia la chiave e si rigiudica
+
+    Returns:
+        digest esadecimale dei due testi
+    """
+
+    digest = hashlib.sha256()
+    # separatore esplicito, senza coppie diverse collassano sulla stessa concatenazione
+    digest.update(parsed_text.encode())
+    digest.update(b"\x00")
+    digest.update(gold_text.encode())
+    return digest.hexdigest()
+
+
+def _judge_cached(parsed_text: str, gold_text: str) -> JudgeResult:
+    """Giudizio del judge, riusato se quella coppia è già passata di qui
+
+    la cache vive solo in memoria di processo, al riavvio del container si riparte da zero
+
+    Returns:
+        ``JudgeResult``, dalla cache oppure appena calcolato
+    """
+
+    key = _judge_key(parsed_text, gold_text)
+    cached = _judge_cache.get(key)
+    if cached is not None:
+        return cached
+
+    result = judge(parsed_text, gold_text)
+
+    # i fallback sono punteggi neutri, non giudizi: se ollama era giù per un attimo e li
+    # cachiamo ce li teniamo fino al riavvio anche dopo che è tornato su
+    if result.diagnostics in ("ok", "repaired"):
+        _judge_cache[key] = result
+
+    return result
+
+
+def _mean(values: list[float]) -> float:
+    """Media arrotondata come le altre metriche, quattro decimali"""
+
+    return round(sum(values) / len(values), 4)
 
 
 def _database_is_available() -> bool:
@@ -627,27 +683,77 @@ async def evaluate_judge(payload: EvaluationInput) -> JudgeEvaluation:
 async def full_gs_eval(
     domain: str = Query(..., description="Dominio su cui aggregare la valutazione"),
 ) -> FullParseEvaluation:
-    """Restituisce metriche e Judge aggregati dai risultati precalcolati."""
+    """Evaluation aggregata su tutto il GS del dominio
+
+    per ogni entry ripassa nel parser l'HTML già salvato nel database, quindi zero richieste di rete,
+    e valuta ``parsed_text`` vs ``gold_text``. Metriche e judge_score sono entrambi medie calcolate
+    sui singoli elementi come chiede la specifica, dal database arriva solo l'HTML
+
+    i risultati precalcolati restano dove servono davvero, cioè in ``/db_stats``, che la specifica
+    vuole esplicitamente costruito su dati già salvati
+
+    Returns:
+        ``FullParseEvaluation`` con la media delle metriche e la media dei judge_score
+
+    nota: le entry che falliscono il parsing vengono saltate, l'aggregato è solo su quelle riuscite
+    e i conteggi finiscono in ``x_eval``
+
+    Raises:
+        HTTPException(400): dominio non supportato
+        HTTPException(502): se tutte le entry del GS falliscono il parsing
+    """
 
     _require_supported_domain(domain)
     entries = await asyncio.to_thread(gold_standard_repository.list_by_domain, domain)
-    eval_by_domain, judge_by_domain = await asyncio.gather(
-        asyncio.to_thread(evaluation_repository.averages_by_domain),
-        asyncio.to_thread(judge_repository.averages_by_domain),
-    )
-    persisted_eval = eval_by_domain.get(domain)
-    persisted_judge = judge_by_domain.get(domain)
-    if persisted_eval is None or persisted_judge is None:
+
+    evaluations: list[ParseEvaluation] = []
+    judge_scores: list[float] = []
+    failed: list[str] = []
+
+    # parsing e giudizio seriali: crawl4ai gira su un browser condiviso e ollama tiene in memoria
+    # una sola copia del modello, mandargli dieci richieste insieme non le fa finire prima, le
+    # accoda e basta, con il rischio in più di mandarle in timeout tutte quante
+    for entry in entries:
+        url = entry["url"]
+        try:
+            doc = await _do_parse(url, entry["html_text"])
+        except HTTPException as err:
+            logger.warning("full_gs_eval: skip %s (%s)", url, err.detail)
+            failed.append(url)
+            continue
+
+        evaluations.append(_do_evaluate(doc.parsed_text, entry["gold_text"]))
+        verdict = await asyncio.to_thread(_judge_cached, doc.parsed_text, entry["gold_text"])
+        judge_scores.append(verdict.judge_score)
+
+    if not evaluations or not judge_scores:
         raise HTTPException(
-            status_code=503,
-            detail=f"precomputed evaluation unavailable for domain {domain}",
+            status_code=502,
+            detail=f"all {len(entries)} URLs in gold standard for {domain} failed to parse",
         )
 
-    token_eval = persisted_eval["token_level_eval"]
-    x_eval = dict(persisted_eval["x_eval"])
-    x_eval["n_total"] = len(entries)
+    token_evals = [item.token_level_eval for item in evaluations]
+    rouge_1 = [item.x_eval["rouge_1"] for item in evaluations]
+    x_eval: dict = {
+        "n_evaluated": len(evaluations),
+        "n_total": len(entries),
+        "chrf": _mean([item.x_eval["chrf"] for item in evaluations]),
+        "noise_ratio": _mean([item.x_eval["noise_ratio"] for item in evaluations]),
+        "rouge_1": {
+            "precision": _mean([item["precision"] for item in rouge_1]),
+            "recall": _mean([item["recall"] for item in rouge_1]),
+            "f1": _mean([item["f1"] for item in rouge_1]),
+        },
+    }
+    if failed:
+        x_eval["failed_urls"] = failed
+
     return FullParseEvaluation(
-        token_level_eval=TokenLevelEval(**token_eval),
+        token_level_eval=TokenLevelEval(
+            precision=_mean([item.precision for item in token_evals]),
+            recall=_mean([item.recall for item in token_evals]),
+            f1=_mean([item.f1 for item in token_evals]),
+        ),
         x_eval=x_eval,
-        judge_score=float(persisted_judge["judge_score"]),
+        judge_score=_mean(judge_scores),
     )

@@ -1,9 +1,14 @@
 # Limite di caratteri per ciascuno dei due testi inviati al modello.
-# La specifica consente esplicitamente il troncamento per contenere i tempi su
-# CPU. Il valore non è arbitrario: a 4000 caratteri il modello arrivava a
-# riportare porzioni dell'articolo come rumore e a votare 1 estrazioni con F1
-# pari a 1.000; a 1500 il comportamento è stabile.
-MAX_CHARS: int = 1500
+# La specifica consente esplicitamente il troncamento per limitare i tempi di
+# attesa, e qui serve davvero: a 1500 caratteri il judge costa circa 21s per
+# entry, dieci entry per dominio fanno 210s contro i 360s di timeout del
+# tester, margine troppo stretto su una macchina più lenta della nostra. A 500
+# si scende a circa 7s per entry. Non è nemmeno un compromesso sulla qualità:
+# a 4000 caratteri il modello arrivava a riportare porzioni dell'articolo come
+# rumore e a votare 1 estrazioni con F1 pari a 1.000, e nei test fatti in fase
+# di selezione del modello il giudizio su input brevi è risultato anche più
+# affidabile che su input lunghi.
+MAX_CHARS: int = 500
 
 
 # Prompt in inglese anche per i domini italiani: i modelli di questa fascia
