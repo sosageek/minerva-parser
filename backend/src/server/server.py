@@ -244,6 +244,12 @@ def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
     )
 
 
+def _mean(values: list[float]) -> float:
+    """Media arrotondata come le altre metriche, quattro decimali"""
+
+    return round(sum(values) / len(values), 4)
+
+
 def _database_is_available() -> bool:
     """Verifica MariaDB tramite il connection pool"""
 
@@ -627,27 +633,77 @@ async def evaluate_judge(payload: EvaluationInput) -> JudgeEvaluation:
 async def full_gs_eval(
     domain: str = Query(..., description="Dominio su cui aggregare la valutazione"),
 ) -> FullParseEvaluation:
-    """Restituisce metriche e Judge aggregati dai risultati precalcolati."""
+    """Evaluation aggregata su tutto il GS del dominio
+
+    per ogni entry ripassa nel parser l'HTML già salvato nel database, quindi zero richieste di rete,
+    e valuta ``parsed_text`` vs ``gold_text``. Metriche e judge_score sono entrambi medie calcolate
+    sui singoli elementi come chiede la specifica, dal database arriva solo l'HTML
+
+    i risultati precalcolati restano dove servono davvero, cioè in ``/db_stats``, che la specifica
+    vuole esplicitamente costruito su dati già salvati
+
+    Returns:
+        ``FullParseEvaluation`` con la media delle metriche e la media dei judge_score
+
+    nota: le entry che falliscono il parsing vengono saltate, l'aggregato è solo su quelle riuscite
+    e i conteggi finiscono in ``x_eval``
+
+    Raises:
+        HTTPException(400): dominio non supportato
+        HTTPException(502): se tutte le entry del GS falliscono il parsing
+    """
 
     _require_supported_domain(domain)
     entries = await asyncio.to_thread(gold_standard_repository.list_by_domain, domain)
-    eval_by_domain, judge_by_domain = await asyncio.gather(
-        asyncio.to_thread(evaluation_repository.averages_by_domain),
-        asyncio.to_thread(judge_repository.averages_by_domain),
-    )
-    persisted_eval = eval_by_domain.get(domain)
-    persisted_judge = judge_by_domain.get(domain)
-    if persisted_eval is None or persisted_judge is None:
+
+    evaluations: list[ParseEvaluation] = []
+    judge_scores: list[float] = []
+    failed: list[str] = []
+
+    # parsing e giudizio seriali: crawl4ai gira su un browser condiviso e ollama tiene in memoria
+    # una sola copia del modello, mandargli dieci richieste insieme non le fa finire prima, le
+    # accoda e basta, con il rischio in più di mandarle in timeout tutte quante
+    for entry in entries:
+        url = entry["url"]
+        try:
+            doc = await _do_parse(url, entry["html_text"])
+        except HTTPException as err:
+            logger.warning("full_gs_eval: skip %s (%s)", url, err.detail)
+            failed.append(url)
+            continue
+
+        evaluations.append(_do_evaluate(doc.parsed_text, entry["gold_text"]))
+        verdict = await asyncio.to_thread(judge, doc.parsed_text, entry["gold_text"])
+        judge_scores.append(verdict.judge_score)
+
+    if not evaluations or not judge_scores:
         raise HTTPException(
-            status_code=503,
-            detail=f"precomputed evaluation unavailable for domain {domain}",
+            status_code=502,
+            detail=f"all {len(entries)} URLs in gold standard for {domain} failed to parse",
         )
 
-    token_eval = persisted_eval["token_level_eval"]
-    x_eval = dict(persisted_eval["x_eval"])
-    x_eval["n_total"] = len(entries)
+    token_evals = [item.token_level_eval for item in evaluations]
+    rouge_1 = [item.x_eval["rouge_1"] for item in evaluations]
+    x_eval: dict = {
+        "n_evaluated": len(evaluations),
+        "n_total": len(entries),
+        "chrf": _mean([item.x_eval["chrf"] for item in evaluations]),
+        "noise_ratio": _mean([item.x_eval["noise_ratio"] for item in evaluations]),
+        "rouge_1": {
+            "precision": _mean([item["precision"] for item in rouge_1]),
+            "recall": _mean([item["recall"] for item in rouge_1]),
+            "f1": _mean([item["f1"] for item in rouge_1]),
+        },
+    }
+    if failed:
+        x_eval["failed_urls"] = failed
+
     return FullParseEvaluation(
-        token_level_eval=TokenLevelEval(**token_eval),
+        token_level_eval=TokenLevelEval(
+            precision=_mean([item.precision for item in token_evals]),
+            recall=_mean([item.recall for item in token_evals]),
+            f1=_mean([item.f1 for item in token_evals]),
+        ),
         x_eval=x_eval,
-        judge_score=float(persisted_judge["judge_score"]),
+        judge_score=_mean(judge_scores),
     )

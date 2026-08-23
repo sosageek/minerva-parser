@@ -19,7 +19,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly, with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -44,7 +44,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly, with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -69,7 +69,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -119,7 +119,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly, with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -144,7 +144,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference exactly with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -169,7 +169,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -219,7 +219,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly, with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -244,7 +244,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference exactly without any extra noise.",
+      "judge_feedback": "The extracted text matches the reference exactly with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -269,7 +269,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly without any extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -293,9 +293,9 @@
     },
     "judge": {
       "model_name": "qwen3:4b",
-      "judge_score": 4,
-      "judge_feedback": "The article is essentially whole with a small unwanted fragment added.",
-      "extra_noise": "Flesh __ by David Szalay was named the winner of the Booker Prize 2025 at a ceremony in London on Monday, 10 November. Szalay receives £50,000 and a trophy, which was presented to him by last year’s winner, Samantha Harvey.",
+      "judge_score": 5,
+      "judge_feedback": "The extracted text matches the reference exactly without any extra noise.",
+      "extra_noise": "",
       "prompt_version": "v8"
     }
   },
@@ -319,7 +319,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference exactly with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -343,9 +343,9 @@
     },
     "judge": {
       "model_name": "qwen3:4b",
-      "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
-      "extra_noise": "",
+      "judge_score": 4,
+      "judge_feedback": "The title 'Flesh' appears twice in the extracted text but is only once in the reference, so a small detail is lost.",
+      "extra_noise": "Flesh",
       "prompt_version": "v8"
     }
   },
@@ -369,7 +369,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly, with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -394,7 +394,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly, with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -443,8 +443,8 @@
     },
     "judge": {
       "model_name": "qwen3:4b",
-      "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly, with no extra noise or missing content.",
+      "judge_score": 4,
+      "judge_feedback": "The article is essentially whole but the award amount differs from the reference (50,000 vs 350,000).",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -468,9 +468,9 @@
     },
     "judge": {
       "model_name": "qwen3:4b",
-      "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
-      "extra_noise": "",
+      "judge_score": 4,
+      "judge_feedback": "The article is essentially whole with a small detail lost (the asterisks in the title) and a small unwanted fragment (the repeated phrase).",
+      "extra_noise": "The Witch**** is shortlisted for the International Booker Prize 2026. Read an extract here",
       "prompt_version": "v8"
     }
   },
@@ -494,7 +494,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly, with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -544,7 +544,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -569,7 +569,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly without any extra noise.",
+      "judge_feedback": "The extracted text matches the reference exactly and contains no extra noise.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -594,7 +594,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly, with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly without any extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -619,7 +619,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly without any extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -643,9 +643,9 @@
     },
     "judge": {
       "model_name": "qwen3:4b",
-      "judge_score": 4,
-      "judge_feedback": "The extracted text includes a title 'Prodotti del Satellite MTG-i1' that is not present in the reference text, but the article content is otherwise intact.",
-      "extra_noise": "Prodotti del Satellite MTG-i1",
+      "judge_score": 5,
+      "judge_feedback": "The extracted text matches the reference text exactly without any extra noise or missing content.",
+      "extra_noise": "",
       "prompt_version": "v8"
     }
   },
@@ -668,8 +668,8 @@
     },
     "judge": {
       "model_name": "qwen3:4b",
-      "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
+      "judge_score": 4,
+      "judge_feedback": "The article is essentially whole with a small detail lost in the reference text.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -743,9 +743,9 @@
     },
     "judge": {
       "model_name": "qwen3:4b",
-      "judge_score": 4,
-      "judge_feedback": "The extracted text includes an extra section title that is not present in the reference text.",
-      "extra_noise": "La Previsione delle Aurore",
+      "judge_score": 5,
+      "judge_feedback": "The extracted text matches the reference text exactly without any extra noise or missing content.",
+      "extra_noise": "",
       "prompt_version": "v8"
     }
   },
@@ -794,7 +794,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -819,7 +819,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference exactly with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -844,8 +844,8 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 4,
-      "judge_feedback": "The extracted text has some extra noise at the top but the article content is mostly intact.",
-      "extra_noise": "California\nParks\n *",
+      "judge_feedback": "One small extra character (asterisk) but the article content is mostly intact.",
+      "extra_noise": " *",
       "prompt_version": "v8"
     }
   },
@@ -869,7 +869,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -893,9 +893,9 @@
     },
     "judge": {
       "model_name": "qwen3:4b",
-      "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
-      "extra_noise": "",
+      "judge_score": 4,
+      "judge_feedback": "The extracted text has an extra heading 'Spring Season' that isn't in the reference, but the article content is mostly preserved.",
+      "extra_noise": "Spring Season",
       "prompt_version": "v8"
     }
   },
@@ -919,7 +919,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference exactly with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference exactly, with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -994,7 +994,7 @@
     "judge": {
       "model_name": "qwen3:4b",
       "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference exactly with no extra noise or missing content.",
+      "judge_feedback": "The extracted text matches the reference text exactly with no extra noise or missing content.",
       "extra_noise": "",
       "prompt_version": "v8"
     }
@@ -1018,9 +1018,9 @@
     },
     "judge": {
       "model_name": "qwen3:4b",
-      "judge_score": 5,
-      "judge_feedback": "The extracted text matches the reference text exactly without any extra noise or missing content.",
-      "extra_noise": "",
+      "judge_score": 4,
+      "judge_feedback": "The extracted text is mostly accurate but has a truncated sentence that appears to be cut off in the reference.",
+      "extra_noise": "Teach others about the park and swear in new Junior Rangers in the visitor",
       "prompt_version": "v8"
     }
   }
