@@ -35,6 +35,8 @@ services:
       - "8004:8004"
     environment:
       BACKEND_URL: ${BACKEND_URL:-http://backend:8003}
+      # serve solo alla home per scrivere quale modello fa da judge
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
     depends_on:
       - backend
 
