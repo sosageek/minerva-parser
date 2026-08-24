@@ -4,73 +4,100 @@
 {% block content %}
 <div class="layout">
 
-  <section class="layout__panel layout__panel--brand">
-    <div class="brand">
-      <img src="/static/minerva.png" alt="Minerva NLP" class="brand__logo">
-      <div>
-        <p class="eyebrow eyebrow--light">Laboratorio<br>ingegneria informatica<br>2026</p>
-        <h1 class="brand__title">Minerva Parser<span class="brand__title-dot">.</span></h1>
+  <div class="layout__stack">
+    <section class="layout__panel layout__panel--brand">
+      <div class="brand">
+        <img src="/static/minerva.png" alt="Minerva NLP" class="brand__logo">
+        <div>
+          <p class="eyebrow eyebrow--light">Laboratorio<br>ingegneria informatica<br>2026</p>
+          <h1 class="brand__title">Minerva Parser<span class="brand__title-dot">.</span></h1>
+        </div>
       </div>
-    </div>
-  </section>
+    </section>
 
-  <section class="layout__panel layout__panel--search">
-    <p class="eyebrow">Cosa fa questo progetto</p>
-    <p class="hint" style="font-size:.85rem; margin-top:0;">
-      Data una URL di uno dei domini supportati, il sistema scarica o riceve l'HTML,
-      isola il contenuto informativo, produce testo Markdown pulito e ne valuta la
-      qualità rispetto a un Gold Standard, sia con metriche deterministiche sia con
-      un LLM-as-a-Judge locale (Ollama).
+    <section class="layout__panel">
+      <div class="panel-head"><h3>Team</h3></div>
+      <ul class="entry-list">
+        {% for member in team %}
+        <li class="entry-list__row">
+          <span class="entry-list__key entry-list__key--name">{{ member.nome }}</span>
+          <span class="entry-list__value entry-list__value--id">{{ member.matricola or "—" }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+  </div>
+
+  <section class="layout__panel layout__panel--pipeline">
+    <div class="panel-head"><h3>Pipeline</h3></div>
+    {# il "+" invece della freccia perché lì la catena non prosegue, si uniscono
+       due input: il plain text appena prodotto e il gold text già nel db #}
+    <p class="pipeline">
+      <span class="pipeline__step">url</span>
+      <span class="pipeline__sep">&darr;</span>
+      <span class="pipeline__step">html</span>
+      <span class="pipeline__sep">&darr;</span>
+      <span class="pipeline__step">markdown</span>
+      <span class="pipeline__sep">&darr;</span>
+      <span class="pipeline__step">plain text</span>
+      <span class="pipeline__sep">+</span>
+      <span class="pipeline__step">gold standard</span>
+      <span class="pipeline__sep">&darr;</span>
+      <span class="pipeline__step">valutazione</span>
     </p>
-    <div class="gs-picker">
-      <span class="gs-picker__hint">vai a</span>
-      <a class="btn btn--outline" href="/parser">Parser &amp; Evaluation</a>
-      <a class="btn btn--outline" href="/gold-standard">Gold Standard Builder</a>
-      <a class="btn btn--outline" href="/stats">Stats</a>
-    </div>
   </section>
 
-  <section class="layout__panel layout__panel--half">
-    <div class="panel-head"><h3>Team</h3></div>
-    <div class="meta__list">
-      {% for member in team %}
-      <div class="meta__row">
-        {{ member.nome }} · matricola {{ member.matricola or "—" }}
-      </div>
-      {% endfor %}
-    </div>
-  </section>
-
-  <section class="layout__panel layout__panel--half">
+  <section class="layout__panel layout__panel--domains">
     <div class="panel-head"><h3>Domini supportati</h3></div>
     {% if domains %}
-    <div class="meta__badges">
-      {% for d in domains %}<span class="meta__badge">{{ d }}</span>{% endfor %}
-    </div>
+    <ul class="entry-list">
+      {% for d in domains %}
+      <li class="entry-list__row">
+        <span class="entry-list__key">{{ d.label }}</span>
+        <span class="entry-list__value entry-list__value--host">
+          <a href="https://{{ d.host }}" target="_blank" rel="noopener">{{ d.host }}</a>
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
     {% else %}
     <p class="hint">Backend non raggiungibile: nessun dominio disponibile.</p>
     {% endif %}
   </section>
 
-  <section class="layout__panel layout__panel--full">
-    <div class="panel-head"><h3>Stato dei servizi</h3><span class="panel-head__tag">GET /status</span></div>
+  {# questi sono i campi veri di ParseEvaluation, se cambia x_eval va rifatta #}
+  <section class="layout__panel layout__panel--eval">
+    <div class="panel-head"><h3>Valutazione</h3><span class="panel-head__tag">POST /evaluate</span></div>
+    <ul class="entry-list">
+      <li class="entry-list__row"><span class="entry-list__key entry-list__key--braced">token-level</span></li>
+      <li class="entry-list__row"><span class="entry-list__key entry-list__key--braced">rouge-1</span></li>
+      <li class="entry-list__row"><span class="entry-list__key entry-list__key--braced">chrf</span></li>
+      <li class="entry-list__row"><span class="entry-list__key entry-list__key--braced">noise ratio</span></li>
+      <li class="entry-list__row">
+        <span class="entry-list__key entry-list__key--braced">llm-as-a-judge / <b class="entry-list__model">{{ judge_model }}</b></span>
+      </li>
+    </ul>
+  </section>
+
+  <section class="layout__panel layout__panel--status">
+    <div class="panel-head"><h3>Status</h3><span class="panel-head__tag">GET /status</span></div>
     {% if status %}
     <div class="status-row">
       <span class="status-pill status-pill--{{ 'ok' if status.backend == 'ok' else 'error' }}">
-        <span class="status-pill__dot"></span>backend: {{ status.backend }}
+        <span class="status-pill__dot"></span>backend: <b class="status-pill__value">{{ status.backend }}</b>
       </span>
       <span class="status-pill status-pill--{{ 'ok' if status.database == 'ok' else 'error' }}">
-        <span class="status-pill__dot"></span>database: {{ status.database }}
+        <span class="status-pill__dot"></span>database: <b class="status-pill__value">{{ status.database }}</b>
       </span>
       <span class="status-pill status-pill--{{ 'ok' if status.ollama == 'ok' else 'error' }}">
-        <span class="status-pill__dot"></span>ollama / judge: {{ status.ollama }}
+        <span class="status-pill__dot"></span>ollama / llm-judge: <b class="status-pill__value">{{ status.ollama }}</b>
       </span>
     </div>
     {% if status.database != 'ok' %}
     <p class="hint">Database non disponibile: Parser &amp; Evaluation e Gold Standard Builder potrebbero non funzionare.</p>
     {% endif %}
     {% if status.ollama != 'ok' %}
-    <p class="hint">Ollama/Judge non disponibile: le metriche deterministiche restano comunque utilizzabili, il punteggio Judge no.</p>
+    <p class="hint">Ollama non disponibile: le metriche deterministiche restano comunque utilizzabili, il punteggio dell'LLM-judge no.</p>
     {% endif %}
     {% else %}
     <p class="hint">Impossibile contattare il backend all'indirizzo configurato (BACKEND_URL).</p>

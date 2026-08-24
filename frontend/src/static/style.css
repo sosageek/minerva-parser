@@ -75,13 +75,22 @@ a { color: var(--maroon); }
   border: 2px solid var(--ink); border-radius: 4px;
   padding: 24px;
 }
-.layout__panel--brand, .layout__panel--search { grid-row: span 2; }
 .layout__panel--brand {
-  grid-column: span 5;
   background: var(--maroon); color: var(--paper);
   display: flex; align-items: center;
 }
-.layout__panel--search { grid-column: span 7; margin-top: 24px; }
+/* brand e team stanno in una colonna a parte invece che essere due caselle
+   della griglia: da soli si allineerebbero alle righe, e siccome domini è
+   più alto del logo fra i due si aprirebbe un buco. così restano attaccati */
+.layout__stack { grid-column: span 5; grid-row: span 2; display: flex; flex-direction: column; gap: 16px; }
+/* gli altri tre. la pipeline copre due righe ma con align-self non si stira,
+   si ferma dove finisce la catena. valutazione invece parte dalla seconda
+   riga e scende fino in fondo, così il suo bordo basso pareggia quello di
+   status, che si ferma prima perché le ultime quattro colonne sono sue */
+.layout__panel--pipeline { grid-column: span 3; grid-row: span 2; align-self: start; }
+.layout__panel--domains  { grid-column: span 4; }
+.layout__panel--eval     { grid-column: span 4; grid-row: span 2; }
+.layout__panel--status   { grid-column: span 8; }
 .layout__panel--parsed { grid-column: span 7; }
 .layout__panel--gold   { grid-column: span 5; margin-top: 24px; }
 .layout__panel--metric { grid-column: span 4; }
@@ -100,7 +109,8 @@ a { color: var(--maroon); }
 
 /* mobile tutto in colonna singola */
 @media (max-width: 960px) {
-  .layout__panel { grid-column: span 12 !important; grid-row: auto !important; margin-top: 0 !important; }
+  .layout__panel,
+  .layout__stack { grid-column: span 12 !important; grid-row: auto !important; margin-top: 0 !important; }
   .navbar__links { margin-left: 0; }
 }
 
@@ -140,6 +150,46 @@ textarea.search__input { min-height: 160px; resize: vertical; font-size: .8rem; 
 .gs-picker__hint { width: 100%; color: rgba(26, 26, 30, .68); font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; }
 .gs-picker__select { flex: 1 1 0; min-width: 0; font: .8rem "Geist Mono", "Segoe UI", -apple-system, monospace; padding: 8px 16px; cursor: pointer; border: 2px solid var(--ink); border-radius: 4px; background: var(--paper); }
 .gs-picker__select:disabled { background: rgba(26, 26, 30, .03); color: rgba(26, 26, 30, .42); border-color: rgba(26, 26, 30, .15); cursor: not-allowed; }
+
+/* elenco entry gs */
+.gs-entries { list-style: none; margin: 0; padding: 0; border-top: 2px solid rgba(26, 26, 30, .15); }
+.gs-entries__row { display: flex; align-items: center; gap: 16px; padding: 8px 0; border-bottom: 1px solid rgba(26, 26, 30, .12); }
+.gs-entries__url { flex: 1 1 0; min-width: 0; font-size: .78rem; color: var(--ink); word-break: break-all; }
+.gs-entries__url:hover { color: var(--maroon); }
+
+/* ------------------------------------------------------------------ home */
+
+/* i riquadri non prendono tutta la larghezza del tile, stanno al centro e
+   larghi uguali fra loro perché il min-width li pareggia sul più lungo */
+.pipeline { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0; }
+.pipeline__step { min-width: 70%; padding: 6px 12px; border: 2px solid var(--ink); border-radius: 4px; text-align: center; font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; }
+.pipeline__sep { text-align: center; line-height: 1; font-size: .75rem; color: rgba(26, 26, 30, .42); }
+
+.entry-list { list-style: none; margin: 0; padding: 0; }
+/* wrap perché nei tile stretti "national park service" e il suo dominio non
+   ci stanno affiancati, meglio mandarlo a capo che schiacciare il nome */
+.entry-list__row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 8px 0; border-bottom: 1px solid rgba(26, 26, 30, .12); }
+.entry-list__row:last-child { border-bottom: none; }
+.entry-list__key { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.entry-list__key--name { font-size: .82rem; text-transform: none; letter-spacing: 0; }
+.entry-list__value { color: rgba(26, 26, 30, .55); font-size: .75rem; word-break: break-all; }
+/* parentesi nel css e non nel template: in jinja una graffa singola accanto a
+   una interpolazione si legge malissimo */
+/* il dominio va a filo del bordo destro, il nome resta a sinistra */
+.entry-list__value--host { margin-left: auto; }
+.entry-list__value--host::before { content: "["; }
+.entry-list__value--host::after { content: "]"; }
+.entry-list__value--id::before,
+.entry-list__key--braced::before { content: "{"; }
+.entry-list__value--id::after,
+.entry-list__key--braced::after { content: "}"; }
+/* il nome del modello più grosso del resto della riga, è l'unica cosa del
+   tile che cambia se cambiamo judge */
+.entry-list__model { color: var(--maroon); font-size: 1rem; }
+/* il link eredita il grigio della riga, così le parentesi non finiscono
+   sottolineate insieme al dominio */
+.entry-list__value--host a { color: inherit; }
+.entry-list__value--host a:hover { color: var(--maroon); }
 
 /* ------------------------------------------------------------------ meta */
 
@@ -184,10 +234,14 @@ details[open] > .html-toggle::before { content: "−"; }
 
 /* -------------------------------------------------------------- status */
 
-.status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border: 2px solid currentColor; }
+.status-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 4px; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; border: 2px solid currentColor; }
 .status-pill--ok { color: var(--ok); }
 .status-pill--error { color: var(--error); }
 .status-pill__dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+/* stesso gioco delle graffe e delle quadre altrove, qui tocca alle angolari */
+.status-pill::before { content: "<"; }
+.status-pill::after { content: ">"; }
+.status-pill__value { font-size: 1rem; }
 .status-row { display: flex; gap: 12px; flex-wrap: wrap; }
 
 /* --------------------------------------------------------------- stats */

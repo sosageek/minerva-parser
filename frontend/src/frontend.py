@@ -14,6 +14,10 @@ logger = logging.getLogger("minerva-parser.frontend")
 
 BACKEND_URL: str = os.environ.get("BACKEND_URL", "http://backend:8003")
 REQUEST_TIMEOUT: float = float(os.environ.get("REQUEST_TIMEOUT", "60"))
+# è la stessa variabile che compose passa a backend e ollama. la leggo di qui
+# invece di scrivere il nome del modello dentro al template: se un domani
+# cambia modello, cambia in un posto solo e la home non racconta bugie
+OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "qwen3:4b")
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -26,10 +30,21 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
 
 TEAM: list[dict] = [
-    {"nome": "Gabriele Lobello", "matricola": 2115145},
-    {"nome": "Marco Mazzocco", "matricola": 213644},
-    {"nome": "Valentina Cillo", "matricola": 2109528},
+    {"nome": "Cillo Valentina", "matricola": 2109528},
+    {"nome": "Lobello Gabriele", "matricola": 2115145},
+    {"nome": "Mazzocco Marco", "matricola": 2136444},
 ]
+
+# il netloc da solo dice poco a chi apre la home, quindi in lista ci metto
+# accanto il nome per esteso. è solo presentazione: i domini validi restano
+# quelli che risponde il backend su /domains, se ne aggiunge uno che qui non
+# ho etichettato viene fuori il netloc e amen
+DOMAIN_LABELS: dict[str, str] = {
+    "en.wikipedia.org": "Wikipedia",
+    "thebookerprizes.com": "The Booker Prizes",
+    "www.meteoam.it": "MeteoAM",
+    "www.nps.gov": "National Park Service",
+}
 
 
 def _extract_domain(url: str) -> str | None:
@@ -348,12 +363,44 @@ def _gold_standard_defaults(url: str = "", mode: str = "live") -> dict:
     return {
         "url": url,
         "mode": mode,
+        "domains": [],
+        "selected_domain": None,
+        "gs_urls": [],
         "fetch_result": None,
         "fetch_error": None,
         "existing_gold": None,
         "save_status": None,
         "delete_status": None,
     }
+
+
+async def _load_gs_index(
+    client: httpx.AsyncClient,
+    context: dict,
+    domain: str | None = None,
+) -> None:
+    """
+    Popola il contesto con i domini supportati e con gli URL già nel Gold Standard.
+
+    Viene chiamata da tutte le route della pagina, non solo dalla GET, così la
+    lista delle entry esistenti resta visibile anche dopo un salvataggio o una
+    cancellazione. Se il dominio non arriva o non è fra quelli supportati si
+    ricade sul primo disponibile, per non presentare una tendina vuota al primo
+    accesso.
+
+    Args:
+        client: httpx.AsyncClient usato per effettuare le richieste asincrone.
+        context: contesto del template, modificato sul posto.
+        domain: dominio scelto dall'utente, oppure None.
+    """
+    domains = await _fetch_domains(client)
+    context["domains"] = domains
+
+    if domain not in domains:
+        domain = domains[0] if domains else None
+
+    context["selected_domain"] = domain
+    context["gs_urls"] = await _fetch_gold_standard_urls(client, domain) if domain else []
 
 
 
@@ -369,9 +416,10 @@ async def home(request: Request) -> HTMLResponse:
     context = {
         "request": request,
         "active_page": "home",
-        "domains": domains,
+        "domains": [{"host": d, "label": DOMAIN_LABELS.get(d, d)} for d in domains],
         "status": status,
         "team": TEAM,
+        "judge_model": OLLAMA_MODEL,
     }
     return templates.TemplateResponse(request, "home.html", context)
 
@@ -442,20 +490,26 @@ async def gold_standard_page(
     request: Request,
     url: str | None = Query(default=None, description="URL da acquisire"),
     mode: str = Query(default="live", description="'live' o 'local'"),
+    domain: str | None = Query(default=None, description="dominio di cui elencare le entry GS"),
 ) -> HTMLResponse:
     """
-    Gold Standard Builder: acquisizione HTML (Live/Local) e anteprima del
-    parsed text come punto di partenza per il gold text.
+    Gold Standard Builder: selezione del dominio con le entry già presenti,
+    acquisizione HTML (Live/Local) e anteprima del parsed text come punto di
+    partenza per il gold text.
     """
     context = _gold_standard_defaults(url or "", mode)
     context["request"] = request
     context["active_page"] = "gold_standard"
 
-    if url:
-        if _extract_domain(url) is None:
-            context["fetch_error"] = "URL malformato: serve uno scheme http/https e un netloc valido"
-        else:
-            async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+        # se arrivo qui cliccando una URL della lista il dominio non è nella query,
+        # lo ricavo dalla URL così la lista mostrata resta quella giusta
+        await _load_gs_index(client, context, domain or _extract_domain(url or ""))
+
+        if url:
+            if _extract_domain(url) is None:
+                context["fetch_error"] = "URL malformato: serve uno scheme http/https e un netloc valido"
+            else:
                 fetch_result, err = await _do_parse(client, url, local=(mode == "local"))
                 context["fetch_result"] = fetch_result
                 context["fetch_error"] = err
@@ -482,6 +536,7 @@ async def save_gold_standard(
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         result = await _add_gold_standard(client, url, gold_text)
         context["save_status"] = {"status": result.get("status", "error"), "url": url}
+        await _load_gs_index(client, context, _extract_domain(url))
 
         fetch_result, err = await _do_parse(client, url, local=True)
         context["fetch_result"] = fetch_result
@@ -501,6 +556,7 @@ async def delete_gs_route(request: Request, url: str = Form(...)) -> HTMLRespons
 
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         result = await _delete_gold_standard(client, url)
+        await _load_gs_index(client, context, _extract_domain(url))
 
     context["delete_status"] = {
         "status": result.get("status", "error"),
@@ -519,6 +575,7 @@ async def delete_resource_route(request: Request, url: str = Form(...)) -> HTMLR
 
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         result = await _delete_web_resource(client, url)
+        await _load_gs_index(client, context, _extract_domain(url))
 
     context["delete_status"] = {
         "status": result.get("status", "error"),

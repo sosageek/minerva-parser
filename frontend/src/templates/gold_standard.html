@@ -5,7 +5,37 @@
 <div class="layout">
 
   <section class="layout__panel layout__panel--full">
-    <p class="eyebrow">1 · Acquisisci una pagina</p>
+    <p class="eyebrow">1 · Dominio</p>
+    <form class="gs-picker" method="get" action="/gold-standard" id="domain-form">
+      <span class="gs-picker__hint">entry già presenti nel gold standard</span>
+      <select class="gs-picker__select" name="domain" id="domain-select">
+        {% for d in domains %}<option value="{{ d }}" {% if d == selected_domain %}selected{% endif %}>{{ d }}</option>{% endfor %}
+      </select>
+      <button class="btn btn--outline" type="submit">Mostra</button>
+    </form>
+
+    {% if gs_urls %}
+    <ul class="gs-entries section-gap">
+      {% for gs_url in gs_urls %}
+      <li class="gs-entries__row">
+        <a class="gs-entries__url" href="/gold-standard?url={{ gs_url | urlencode }}&mode=local">{{ gs_url }}</a>
+        <form method="post" action="/gold-standard/delete-gs" onsubmit="return confirm('Eliminare il Gold Standard di questa URL? La web resource resta.');">
+          <input type="hidden" name="url" value="{{ gs_url }}">
+          <button class="btn btn--danger" type="submit">Elimina</button>
+        </form>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="hint">{{ gs_urls | length }} entry per {{ selected_domain }}. Clicca una URL per rileggerla in Local e correggerne il gold text.</p>
+    {% elif selected_domain %}
+    <p class="hint section-gap">Nessuna entry nel Gold Standard per {{ selected_domain }}.</p>
+    {% else %}
+    <p class="hint section-gap">Backend non raggiungibile, impossibile elencare i domini.</p>
+    {% endif %}
+  </section>
+
+  <section class="layout__panel layout__panel--full">
+    <p class="eyebrow">2 · Acquisisci una pagina</p>
     <form class="search" method="get" action="/gold-standard" id="fetch-form">
       <input class="search__input" type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
       <div class="radio-group">
@@ -55,7 +85,7 @@
   </section>
 
   <section class="layout__panel layout__panel--gold">
-    <p class="eyebrow">2 · Gold text</p>
+    <p class="eyebrow">3 · Gold text</p>
     <form method="post" action="/gold-standard/save">
       <input type="hidden" name="url" value="{{ fetch_result.url }}">
       <label class="field-label" for="gold_text">testo di riferimento (plain text, senza markdown)</label>
@@ -70,7 +100,7 @@
   {% endif %}
 
   <section class="layout__panel layout__panel--full">
-    <p class="eyebrow">3 · Elimina</p>
+    <p class="eyebrow">4 · Elimina per URL</p>
     <div class="layout" style="gap:16px;">
       <div class="layout__panel--half" style="grid-column: span 6;">
         <form method="post" action="/gold-standard/delete-gs" onsubmit="return confirm('Eliminare solo il Gold Standard per questa URL? La web resource resta.');">
@@ -118,6 +148,10 @@
     URL.revokeObjectURL(link.href);
   });
 {% endif %}
+
+  document.getElementById("domain-select").addEventListener("change", (e) => {
+    e.target.form.submit();
+  });
 
   document.getElementById("fetch-form").addEventListener("submit", () => {
     document.getElementById("fetch-btn").disabled = true;
