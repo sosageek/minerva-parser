@@ -1,3 +1,5 @@
+"""Verifica risposte fallback e gestione errori del Judge"""
+
 import json
 import importlib
 
@@ -13,6 +15,7 @@ judge_module = importlib.import_module("backend.src.judge.judge")
 
 
 def test_valid_response_is_converted(monkeypatch):
+    """Converte una risposta valida nel risultato pubblico"""
     monkeypatch.setattr(
         judge_module,
         "generate",
@@ -30,6 +33,7 @@ def test_valid_response_is_converted(monkeypatch):
 
 
 def test_invalid_response_is_repaired_once(monkeypatch):
+    """Prova una sola riparazione dopo una risposta non valida"""
     replies = iter(
         [
             ("not-json", 0.5),
@@ -45,6 +49,7 @@ def test_invalid_response_is_repaired_once(monkeypatch):
 
 
 def test_two_invalid_responses_return_neutral_fallback(monkeypatch):
+    """Usa il fallback neutro dopo due risposte non valide"""
     monkeypatch.setattr(judge_module, "generate", lambda prompt, model: ("{}", 0.1))
 
     result = judge_function("parsed", "gold")
@@ -54,7 +59,9 @@ def test_two_invalid_responses_return_neutral_fallback(monkeypatch):
 
 
 def test_ollama_error_never_escapes(monkeypatch):
+    """Trasforma un errore Ollama nel fallback neutro"""
     def unavailable(prompt, model):
+        """Finge Ollama non disponibile"""
         raise OllamaError("TimeoutError")
 
     monkeypatch.setattr(judge_module, "generate", unavailable)
@@ -66,7 +73,9 @@ def test_ollama_error_never_escapes(monkeypatch):
 
 
 def test_unexpected_client_error_never_escapes(monkeypatch):
+    """Trasforma anche un errore inatteso nel fallback neutro"""
     def broken_client(prompt, model):
+        """Finge un errore inatteso del client"""
         raise RuntimeError("unexpected")
 
     monkeypatch.setattr(judge_module, "generate", broken_client)
@@ -78,19 +87,25 @@ def test_unexpected_client_error_never_escapes(monkeypatch):
 
 
 def test_judge_score_is_strict_integer():
+    """Rifiuta punteggi Judge che non sono interi"""
     with pytest.raises(ValidationError):
         models.JudgeResult(model_name="qwen3:4b", judge_score=4.0)
 
 
 def test_generate_wraps_invalid_ollama_json(monkeypatch):
+    """Trasforma il json Ollama non valido in OllamaError"""
     class Response:
+        """Finge una risposta HTTP con json non valido"""
         def __enter__(self):
+            """Apre il contesto della risposta finta"""
             return self
 
         def __exit__(self, *args):
+            """Chiude il contesto senza nascondere gli errori"""
             return False
 
         def read(self):
+            """Restituisce un corpo che non contiene json valido"""
             return b"not-json"
 
     monkeypatch.setattr(client.urllib.request, "urlopen", lambda *args, **kwargs: Response())

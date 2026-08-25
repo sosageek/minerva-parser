@@ -1,3 +1,5 @@
+"""Associa ogni dominio al parser e al suo Gold Standard"""
+
 import json
 from pathlib import Path
 
@@ -21,54 +23,25 @@ GS_FILES: dict[str, Path] = {
 
 
 def supported_domains() -> list[str]:
-    """Ritorna lista ordinata dei domini per cui esiste un parser
-
-    Returns:
-        lista di stringhe ordinata dei domini registrati in ``PARSERS``
-    """
+    """Ritorna lista ordinata dei domini per cui esiste un parser"""
 
     return sorted(PARSERS.keys())
 
 
 def get_parser(domain: str) -> Parser | None:
-    """Ritorna il parser associato al dominio o ``None`` se non supportato
-
-    Args:
-        domain(str): netloc del dominio
-
-    Returns:
-        istanza di ``Parser`` o ``None``
-    """
+    """Ritorna il parser associato al dominio o ``None`` se non supportato"""
 
     return PARSERS.get(domain)
 
 
 def get_gs_file(domain: str) -> Path | None:
-    """Ritorna il path del file GS associato al dominio o ``None`` se non registrato
-    
-    Args:
-        domain(str): netloc del dominio
-
-    Returns:
-        ``Path`` del file GS associato al dominio o ``None``
-    """
+    """Ritorna il path del file GS associato al dominio o ``None`` se non registrato"""
 
     return GS_FILES.get(domain)
 
 
 def load_gold_standards() -> dict[str, list[dict]]:
-    """Carica in memoria tutti i GS all'avvio del server
-
-    nota: rimarrà utile finché i json dei GS sono pochi e di piccole dimensioni,
-    qualora non dovesse essere più così converrebbe caricarli on demand
-
-    Returns:
-        dizionario che mappa ``dominio -> lista di entry del GS``
-
-    Raises:
-        FileNotFoundError: se un file GS dichiarato in ``GS_FILES`` manca
-        RuntimeError: se un dominio in ``PARSERS`` non ha un GS associato
-    """
+    """Carica in memoria tutti i GS all'avvio del server"""
     
     missing = [d for d in PARSERS if d not in GS_FILES]
     if missing:

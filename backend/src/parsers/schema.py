@@ -1,15 +1,9 @@
+"""Definisce il documento restituito dai parser"""
+
 from pydantic import BaseModel, ConfigDict
 
 class ParsedDocument(BaseModel):
-    """Documento parsato
-
-    Attributes:
-        url(str): URL assoluto della pagina di origine
-        domain(str): netloc URL
-        title(str): titolo estratto (da pagina o url)
-        html_text(str): HTML pulito restituito dal crawler 
-        parsed_text(str): testo MD normalizzato e pulito dal parser di dominio
-    """
+    """Documento parsato"""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 

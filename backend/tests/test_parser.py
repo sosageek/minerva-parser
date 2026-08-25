@@ -1,8 +1,4 @@
-"""Test unitari per le utility di pulizia markdown.
-
-Eseguire dalla root del progetto:
-    pytest backend/tests/test_parser.py -v
-"""
+"""Test unitari per le utility di pulizia markdown"""
 
 from backend.src.utils.cleaning import (
     normalize_whitespace,
@@ -11,7 +7,7 @@ from backend.src.utils.cleaning import (
 
 
 def _clean(text: str) -> str:
-    """Helper di test: compone i due step come li userebbe un parser."""
+    """Compone la pulizia come farebbe un parser"""
     return normalize_whitespace(remove_markup(text))
 
 
@@ -20,6 +16,7 @@ def _clean(text: str) -> str:
 # ---------------------------------------------------------------------------
 
 def test_rimuove_immagini_markdown():
+    """Rimuove le immagini Markdown"""
     src = "![logo](https://example.com/logo.png) Testo iniziale"
     out = remove_markup(src)
     assert "logo" not in out
@@ -27,6 +24,7 @@ def test_rimuove_immagini_markdown():
 
 
 def test_link_mantiene_solo_il_testo():
+    """Tiene il testo dei link e rimuove la destinazione"""
     src = "Vedi la voce [Roma](https://en.wikipedia.org/wiki/Rome) per dettagli."
     out = remove_markup(src)
     assert "Roma" in out
@@ -35,7 +33,7 @@ def test_link_mantiene_solo_il_testo():
 
 
 def test_link_con_parentesi_annidate():
-    """Caso Wikipedia: `[testo](https://x.org/foo_(bar))`."""
+    """Mantiene il testo dei link Wikipedia con parentesi annidate"""
     src = "Vedi [Parigi](https://en.wikipedia.org/wiki/Paris_(city)) qui."
     out = remove_markup(src)
     assert "Parigi" in out
@@ -43,6 +41,7 @@ def test_link_con_parentesi_annidate():
 
 
 def test_link_reference_style():
+    """Pulisce i link Markdown in stile reference"""
     src = "Questo link [Wikipedia][wiki] punta altrove."
     out = remove_markup(src)
     assert "Wikipedia" in out
@@ -50,6 +49,7 @@ def test_link_reference_style():
 
 
 def test_ref_definition_rimossa():
+    """Rimuove le definizioni dei link reference"""
     src = "Testo utile.\n[1]: https://example.com/riferimento\nAltro testo."
     out = remove_markup(src)
     assert "https://example.com" not in out
@@ -58,6 +58,7 @@ def test_ref_definition_rimossa():
 
 
 def test_note_orfane_rimosse():
+    """Rimuove le note orfane dal testo"""
     src = "Dante nacque nel 1265 [1] a Firenze [citation needed]."
     out = remove_markup(src)
     assert "[1]" not in out
@@ -66,7 +67,7 @@ def test_note_orfane_rimosse():
 
 
 def test_parentesi_quadre_lunghe_preservate():
-    """Un blocco `[...]` molto lungo non è una nota: non va toccato."""
+    """Un blocco `[...]` molto lungo non è una nota: non va toccato"""
     contenuto_lungo = "x" * 80
     src = f"Prima [{contenuto_lungo}] dopo"
     out = remove_markup(src)
@@ -74,6 +75,7 @@ def test_parentesi_quadre_lunghe_preservate():
 
 
 def test_tabelle_markdown_rimosse():
+    """Rimuove le tabelle Markdown considerate rumore"""
     src = (
         "Introduzione.\n"
         "| Col A | Col B |\n"
@@ -89,6 +91,7 @@ def test_tabelle_markdown_rimosse():
 
 
 def test_tag_html_rimossi():
+    """Rimuove i tag html e conserva il testo"""
     src = "<p>Paragrafo <b>importante</b></p> fine."
     out = remove_markup(src)
     assert "<p>" not in out and "<b>" not in out
@@ -96,6 +99,7 @@ def test_tag_html_rimossi():
 
 
 def test_html_commenti_rimossi():
+    """Rimuove i commenti html"""
     src = "prima <!-- commento nascosto --> dopo"
     out = remove_markup(src)
     assert "commento" not in out
@@ -103,7 +107,7 @@ def test_html_commenti_rimossi():
 
 
 def test_disuguaglianze_preservate():
-    """Regressione: `a < b` NON è un tag HTML, non va strippato."""
+    """Regressione: `a < b` NON è un tag HTML, non va strippato"""
     src = "Dato che a < b e b > 0, allora a > 0."
     out = remove_markup(src)
     assert "a < b" in out
@@ -111,6 +115,7 @@ def test_disuguaglianze_preservate():
 
 
 def test_entita_html_decodificate():
+    """Decodifica le entità html"""
     src = "5 &lt; 10 &amp; &quot;ciao&quot;"
     out = remove_markup(src)
     assert "<" in out and "&" in out and '"ciao"' in out
@@ -122,28 +127,32 @@ def test_entita_html_decodificate():
 # ---------------------------------------------------------------------------
 
 def test_collassa_spazi_multipli():
+    """Collassa gli spazi multipli"""
     src = "parola    con      molti   spazi"
     assert normalize_whitespace(src) == "parola con molti spazi"
 
 
 def test_spazio_prima_punteggiatura():
+    """Rimuove gli spazi prima della punteggiatura"""
     src = "ciao , mondo !  come va ?"
     assert normalize_whitespace(src) == "ciao, mondo! come va?"
 
 
 def test_newline_prima_punteggiatura_non_mangiata():
-    """Regressione: `\\s+` avrebbe mangiato il `\\n`, unendo due righe."""
+    """Mantiene la newline prima della punteggiatura"""
     src = "prima riga\n. seconda riga"
     out = normalize_whitespace(src)
     assert "\n" in out
 
 
 def test_trailing_whitespace_rimosso():
+    """Rimuove gli spazi in coda alle righe"""
     src = "riga con coda   \naltra riga"
     assert normalize_whitespace(src) == "riga con coda\naltra riga"
 
 
 def test_collassa_newline_multipli():
+    """Collassa le newline multiple"""
     src = "paragrafo uno\n\n\n\n\nparagrafo due"
     assert normalize_whitespace(src) == "paragrafo uno\n\nparagrafo due"
 
@@ -153,7 +162,7 @@ def test_collassa_newline_multipli():
 # ---------------------------------------------------------------------------
 
 def test_pipeline_completa_wikipedia_like():
-    """Input realistico stile markdown estratto da Wikipedia."""
+    """Input realistico stile markdown estratto da Wikipedia"""
     src = (
         "# Dante Alighieri\n\n"
         "Dante nacque a [Firenze](https://en.wikipedia.org/wiki/Florence) "
@@ -174,7 +183,7 @@ def test_pipeline_completa_wikipedia_like():
 
 
 def test_idempotente():
-    """Applicare la pulizia due volte deve dare lo stesso risultato."""
+    """Applicare la pulizia due volte deve dare lo stesso risultato"""
     src = "Vedi [Roma](https://example.com) [1] ![img](x.png) <b>!</b>"
     once = _clean(src)
     twice = _clean(once)
@@ -182,5 +191,6 @@ def test_idempotente():
 
 
 def test_stringa_vuota():
+    """Gestisce anche una stringa vuota"""
     assert _clean("") == ""
     assert _clean("   \n\n   ") == ""

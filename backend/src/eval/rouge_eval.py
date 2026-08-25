@@ -1,36 +1,16 @@
+"""Calcola la metrica ROUGE uno"""
+
 import re
 from collections import Counter
 from .eval import Evaluator
 
 
 class RougeOneEvaluator(Evaluator):
-    """
-    Classe per valutare ROUGE-1: sovrapposizione di unigrammi con precision, recall, F1.
-    
-    Attributes:
-        _WORD_RE: Regex per tokenizzare parole.
-    
-    Methods:
-        evaluate(parsed_text, gold_text): Ritorna dict con precision, recall, f1.
-        _tokenize(text): Lista di parole minuscole.
-    """
+    """Classe per valutare ROUGE-1: sovrapposizione di unigrammi con precision, recall, F1"""
     _WORD_RE = re.compile(r"\w+", re.UNICODE) # si può mettere in .eval più tardi
 
     def evaluate(self, parsed_text: str, gold_text: str) -> dict:
-        """Precision, recall e f1 sull'overlap dei token con il gold (ROUGE-1)
-
-        * precision: dei token estratti, quanti stanno davvero nel gold
-        * recall: dei token del gold, quanti il parser è riuscito a prendere
-        * f1: media armonica di precision e recall, come indicatore sintetico
-
-        Args:
-            parsed_text(str): testo estratto dal parser
-            gold_text(str): testo di riferimento del gold standard
-
-        Returns:
-            dict con chiavi ``precision``, ``recall`` ed ``f1``
-            se uno dei due testi è vuoto le metriche corrispondenti valgono zero
-        """
+        """Calcola precision recall e f1 con la metrica ROUGE uno"""
         c_p = Counter(self._tokenize(parsed_text))
         c_g = Counter(self._tokenize(gold_text))
         
@@ -56,6 +36,7 @@ class RougeOneEvaluator(Evaluator):
         }
 
     def _tokenize(self, text: str) -> list:
+        """Divide il testo in parole minuscole"""
         return self._WORD_RE.findall(text.lower())
 
 

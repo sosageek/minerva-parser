@@ -1,3 +1,5 @@
+"""Pulisce il markup lasciato dal crawler"""
+
 import html
 import re
 
@@ -26,18 +28,7 @@ _RE_MULTI_NL    = re.compile(r'\n{3,}')
 
 
 def remove_markup(text: str) -> str:
-    """Pulisce la sintassi markdown/html irrilevante
-
-    * cancella ``![alt](url)``, ``[id]:``, righe di tabella md, tag HTML/commenti, quadre spaiate
-    * sostituisce ``[testo](url)``, ``[testo][id]`` con solo testo
-    * preserva il contenuto di snippet di codice senza delimitatori
-
-    Args:
-        text: markdown grezzo
-
-    Returns:
-        il testo privato senza markdown e html (spazi e newline non normalizzati)
-    """
+    """Pulisce la sintassi markdown/html irrilevante"""
     text = _RE_FENCED_CODE.sub(r'\1', text)
     text = _RE_INLINE_CODE.sub(r'\1', text)
     text = _RE_IMAGE.sub('', text)
@@ -54,17 +45,7 @@ def remove_markup(text: str) -> str:
 
 
 def normalize_whitespace(text: str) -> str:
-    """Normalizza spazi e righe vuote
-
-    * cancella spazi/tab prima della punteggiatura, spazi a fine riga
-    * collassa piu spazi e tab in singolo spazio e newline multipli a soli due
-
-    Args:
-        text: testo con eventuale spazio non normalizzato
-
-    Returns:
-        testo con whitespace uniforme
-    """
+    """Normalizza spazi e righe vuote"""
     text = _RE_SPACE_PUNCT.sub(r'\1', text)
     text = _RE_MULTI_SPACE.sub(' ', text)
     text = _RE_TRAIL_WS.sub('\n', text)

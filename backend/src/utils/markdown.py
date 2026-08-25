@@ -1,3 +1,5 @@
+"""Toglie la formattazione Markdown prima delle metriche"""
+
 import re
 
 _RE_HEADING        = re.compile(r'^#{1,6}\s+', re.MULTILINE)
@@ -19,14 +21,7 @@ _RE_BLOCKQUOTE     = re.compile(r'^[ \t]*>[ \t]*', re.MULTILINE)
 
 
 def strip_formatting(text: str) -> str:
-    """Rimuove formattazione markdown
-
-    Args:
-        text: testo markdown
-
-    Returns:
-        plain text
-    """
+    """Rimuove formattazione markdown"""
     text = text.replace('\xa0', ' ')
     text = _RE_LIST_MARKERS.sub('', text)
     text = _RE_BLOCKQUOTE.sub('', text)

@@ -1,3 +1,5 @@
+"""Espone le API di parsing valutazione e gestione dati"""
+
 import asyncio
 import hashlib
 import logging
@@ -70,12 +72,7 @@ _judge_cache: dict[str, JudgeResult] = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Avvio e chiusura del server
-
-    * configura il logging (formato e livello centralizzati in ``config.py``)
-    * crea il pool, inizializza lo schema e popola il database
-    * alla chiusura chiude il crawler condiviso e il pool di connessioni
-    """
+    """Avvio e chiusura del server"""
 
     configure_logging()
 
@@ -104,17 +101,7 @@ app = FastAPI(
 
 
 def _extract_domain(url: str) -> str:
-    """Estrae netloc da un URL
-
-    Args:
-        url: URL fornito dal client
-
-    Returns:
-        netloc
-
-    Raises:
-        HTTPException(400): se scheme o netloc sono vuoti
-    """
+    """Estrae netloc da un URL"""
 
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
@@ -123,14 +110,7 @@ def _extract_domain(url: str) -> str:
 
 
 def _extract_title_from_html(html_text: str) -> str:
-    """Estrae il contenuto del tag title da un documento HTML
-
-    Args:
-        html_text: HTML grezzo della pagina
-
-    Returns:
-        titolo della pagina, oppure stringa vuota se non è presente
-    """
+    """Estrae il contenuto del tag title da un documento HTML"""
 
     soup = BeautifulSoup(html_text, "html.parser")
 
@@ -141,17 +121,7 @@ def _extract_title_from_html(html_text: str) -> str:
 
 
 def _require_parser(domain: str) -> Parser:
-    """Ritorna il parser per il dominio
-
-    Args:
-        domain: netloc del dominio
-
-    Returns:
-        istanza di ``Parser``
-
-    Raises:
-        HTTPException(400): dominio non in ``registry.PARSERS``
-    """
+    """Ritorna il parser per il dominio"""
 
     parser = get_parser(domain)
     if parser is None:
@@ -163,14 +133,7 @@ def _require_parser(domain: str) -> Parser:
 
 
 def _require_supported_domain(domain: str) -> None:
-    """Validazione del dominio
-
-    Args:
-        domain: netloc del dominio
-
-    Raises:
-        HTTPException(400): dominio non in ``registry.PARSERS``
-    """
+    """Validazione del dominio"""
 
     if domain not in PARSERS:
         raise HTTPException(
@@ -180,22 +143,7 @@ def _require_supported_domain(domain: str) -> None:
 
 
 async def _do_parse(url: str, html_text: str | None = None) -> ParsedDocument:
-    """Esegue il parsing di un URL scegliendo il parser in base al dominio
-
-    se ``html_text`` è fornito il parser processa direttamente quell'html senza effettuare una richiesta di rete: 
-    l'URL viene comunque usato per individuare il parser giusto
-
-    Args:
-        url: URL assoluto
-        html_text: HTML già scaricato dal client (opzionale)
-
-    Returns:
-        ``ParsedDocument``
-
-    Raises:
-        HTTPException(400): dominio non supportato o URL malformato
-        HTTPException(502): crawl fallisce
-    """
+    """Esegue il parsing di un URL scegliendo il parser in base al dominio"""
 
     domain = _extract_domain(url)
     parser = _require_parser(domain)
@@ -207,33 +155,13 @@ async def _do_parse(url: str, html_text: str | None = None) -> ParsedDocument:
 
 
 def _prepare_for_eval(text: str) -> str:
-    """Normalizzazione unica applicata a tutti gli input di evaluation
-
-    * pulizia della formatazzione md inline (grassetto, corsivo, ecc) e di struttura (titoli, intestazioni, ecc)
-    * collassa spazi e newline multipli
-
-    nota: la rimozione di markup senza contenuto semantico / con link esterni (tabelle, immagini, link, ecc)
-    è gestita dai singoli parsers
-
-    Args:
-        text: stringa potenzialmente contenente formattazione markdown
-
-    Returns:
-        plain text pronto per la tokenizzazione e l'evaluation
-    """
+    """Normalizzazione unica applicata a tutti gli input di evaluation"""
 
     return strip_formatting(text)
 
 
 def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
-    """Calcola le metriche di evaluation per una coppia (parsed, gold)
-
-    * ``token_level_eval``: precision, recall, f1 (set)
-    * ``x_eval``: `chrf``, ``noise_ratio`` e ``rouge_1``
-
-    Returns:
-        ``ParseEvaluation`` con ``token_level_eval`` e ``x_eval``
-    """
+    """Calcola le metriche per una coppia parsed e gold"""
 
     parsed_clean = _prepare_for_eval(parsed_text)
     gold_clean = _prepare_for_eval(gold_text)
@@ -250,16 +178,7 @@ def _do_evaluate(parsed_text: str, gold_text: str) -> ParseEvaluation:
 
 
 def _judge_key(parsed_text: str, gold_text: str) -> str:
-    """Chiave di cache di una coppia (parsed, gold)
-
-    sul contenuto e non sull'url perché i test automatici riscrivono html_text con
-    /add_web_resource, quindi lo stesso url può dare un parsed_text diverso da una chiamata
-    all'altra e ci ritroveremmo a servire un giudizio calcolato su un testo che non esiste
-    più. hashando i due testi, se il testo cambia cambia la chiave e si rigiudica
-
-    Returns:
-        digest esadecimale dei due testi
-    """
+    """Crea la chiave di cache per una coppia parsed e gold"""
 
     digest = hashlib.sha256()
     # separatore esplicito, senza coppie diverse collassano sulla stessa concatenazione
@@ -270,13 +189,7 @@ def _judge_key(parsed_text: str, gold_text: str) -> str:
 
 
 def _judge_cached(parsed_text: str, gold_text: str) -> JudgeResult:
-    """Giudizio del judge, riusato se quella coppia è già passata di qui
-
-    la cache vive solo in memoria di processo, al riavvio del container si riparte da zero
-
-    Returns:
-        ``JudgeResult``, dalla cache oppure appena calcolato
-    """
+    """Giudizio del judge, riusato se quella coppia è già passata di qui"""
 
     key = _judge_key(parsed_text, gold_text)
     cached = _judge_cache.get(key)
@@ -306,7 +219,7 @@ def _database_is_available() -> bool:
 
 
 def _ollama_is_available() -> bool:
-    """Verifica l'API di Ollama tramite il probe del componente Judge."""
+    """Verifica l'API di Ollama tramite il probe del componente Judge"""
 
     return judge_is_available(timeout=STATUS_CHECK_TIMEOUT)
 
@@ -385,18 +298,7 @@ def domains() -> SupportedDomains:
 
 @app.get("/parse", response_model=ParseOutput)
 async def parse(url: str = Query(..., description="URL assoluto da parsare")) -> ParseOutput:
-    """Esegue il parser appropriato per l'URL dato
-
-    Args:
-        url: URL assoluto passato come query string
-
-    Returns:
-        ``ParseOutput`` con ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text`` (markdown pulito)
-
-    Raises:
-        HTTPException(400): dominio non supportato o URL malformato
-        HTTPException(502): URL irraggiungibile
-    """
+    """Esegue il parser appropriato per l'URL dato"""
 
     doc = await _do_parse(url)
     return ParseOutput(**doc.model_dump())
@@ -404,22 +306,7 @@ async def parse(url: str = Query(..., description="URL assoluto da parsare")) ->
 
 @app.post("/parse", response_model=ParseOutput)
 async def parse_document(payload: ParseInput) -> ParseOutput:
-    """Esegue il parser in modalità Live o Local
-
-    In modalità Live scarica la pagina e salva la web resource.
-    In modalità Local usa esclusivamente l'HTML presente nel database.
-
-    Args:
-        payload: body con URL e modalità di parsing
-
-    Returns:
-        ``ParseOutput`` con i dati estratti dal parser
-
-    Raises:
-        HTTPException(400): URL malformato o dominio non supportato
-        HTTPException(404): URL non presente nel database in modalità Local
-        HTTPException(502): URL irraggiungibile in modalità Live
-    """
+    """Esegue il parser in modalità Live o Local"""
 
     domain = _extract_domain(payload.url)
     _require_supported_domain(domain)
@@ -462,12 +349,7 @@ def get_gold_standard(
         description="URL presente nel Gold Standard",
     ),
 ) -> GSEntry:
-    """Entry del GS per l'URL dato
-
-    Raises:
-        HTTPException(400): dominio non supportato
-        HTTPException(404): URL non presente nel GS
-    """
+    """Entry del GS per l'URL dato"""
 
     domain = _extract_domain(url)
     entry = gold_standard_repository.get_by_url(url)
@@ -490,11 +372,7 @@ def full_gold_standard(
         description="Dominio per cui restituire il GS",
     ),
 ) -> ListGSEntry:
-    """Tutte le entry del GS per un dominio
-
-    Raises:
-        HTTPException(400): dominio non supportato
-    """
+    """Tutte le entry del GS per un dominio"""
 
     _require_supported_domain(domain)
 
@@ -515,11 +393,7 @@ def gold_standard_urls(
         description="Filtra opzionalmente le URL per dominio",
     ),
 ) -> GoldStandardURLs:
-    """Lista degli URL presenti nel GS
-
-    Raises:
-        HTTPException(400): dominio non supportato
-    """
+    """Lista degli URL presenti nel GS"""
 
     if domain is not None:
         _require_supported_domain(domain)
@@ -531,14 +405,7 @@ def gold_standard_urls(
 
 @app.post("/add_web_resource", response_model=CRUDStatus)
 def add_web_resource(payload: WebResourceInput) -> CRUDStatus:
-    """Aggiunge o aggiorna una web resource nel database
-
-    Args:
-        payload: body con URL e HTML grezzo della risorsa
-
-    Returns:
-        stato dell'operazione
-    """
+    """Aggiunge o aggiorna una web resource nel database"""
 
     try:
         domain = _extract_domain(payload.url)
@@ -564,14 +431,7 @@ def add_web_resource(payload: WebResourceInput) -> CRUDStatus:
 
 @app.post("/add_gold_standard", response_model=CRUDStatus)
 def add_gold_standard(payload: GoldStandardInput) -> CRUDStatus:
-    """Aggiunge o aggiorna un Gold Standard
-
-    Args:
-        payload: body con URL e testo gold
-
-    Returns:
-        stato dell'operazione
-    """
+    """Aggiunge o aggiorna un Gold Standard"""
 
     web_resource = web_resource_repository.get_by_url(
         payload.url,
@@ -598,14 +458,7 @@ def add_gold_standard(payload: GoldStandardInput) -> CRUDStatus:
 
 @app.delete("/gold_standard", response_model=CRUDStatus)
 def delete_gold_standard(payload: URLInput) -> CRUDStatus:
-    """Elimina il Gold Standard lasciando la web resource
-
-    Args:
-        payload: body con l'URL del Gold Standard
-
-    Returns:
-        stato dell'operazione
-    """
+    """Elimina il Gold Standard lasciando la web resource"""
 
     try:
         deleted = gold_standard_repository.delete_by_url(
@@ -627,14 +480,7 @@ def delete_gold_standard(payload: URLInput) -> CRUDStatus:
 
 @app.delete("/web_resource", response_model=CRUDStatus)
 def delete_web_resource(payload: URLInput) -> CRUDStatus:
-    """Elimina una web resource e il relativo GS a cascata
-
-    Args:
-        payload: body con l'URL della web resource
-
-    Returns:
-        stato dell'operazione
-    """
+    """Elimina una web resource e il relativo GS a cascata"""
 
     try:
         deleted = web_resource_repository.delete_by_url(
@@ -656,17 +502,14 @@ def delete_web_resource(payload: URLInput) -> CRUDStatus:
 
 @app.post("/evaluate", response_model=ParseEvaluation)
 def evaluate(payload: EvaluationInput) -> ParseEvaluation:
-    """Calcola metriche di evaluation confrontando ``parsed_text`` dell'output con ``gold_text`` del GS
-
-    nota: la sintassi md viene rimossa prima della tokenizzazione e dell'evaluation
-    """
+    """Calcola metriche di evaluation confrontando ``parsed_text`` dell'output con ``gold_text`` del GS"""
 
     return _do_evaluate(payload.parsed_text, payload.gold_text)
 
 
 @app.post("/evaluate_judge", response_model=JudgeEvaluation)
 async def evaluate_judge(payload: EvaluationInput) -> JudgeEvaluation:
-    """Valuta una coppia parsed/gold con il componente LLM-as-a-Judge."""
+    """Valuta una coppia parsed/gold con il componente LLM-as-a-Judge"""
 
     result = await asyncio.to_thread(judge, payload.parsed_text, payload.gold_text)
     return JudgeEvaluation(
@@ -682,25 +525,7 @@ async def evaluate_judge(payload: EvaluationInput) -> JudgeEvaluation:
 async def full_gs_eval(
     domain: str = Query(..., description="Dominio su cui aggregare la valutazione"),
 ) -> FullParseEvaluation:
-    """Evaluation aggregata su tutto il GS del dominio
-
-    per ogni entry ripassa nel parser l'HTML già salvato nel database, quindi zero richieste di rete,
-    e valuta ``parsed_text`` vs ``gold_text``. Metriche e judge_score sono entrambi medie calcolate
-    sui singoli elementi come chiede la specifica, dal database arriva solo l'HTML
-
-    i risultati precalcolati restano dove servono davvero, cioè in ``/db_stats``, che la specifica
-    vuole esplicitamente costruito su dati già salvati
-
-    Returns:
-        ``FullParseEvaluation`` con la media delle metriche e la media dei judge_score
-
-    nota: le entry che falliscono il parsing vengono saltate, l'aggregato è solo su quelle riuscite
-    e i conteggi finiscono in ``x_eval``
-
-    Raises:
-        HTTPException(400): dominio non supportato
-        HTTPException(502): se tutte le entry del GS falliscono il parsing
-    """
+    """Evaluation aggregata su tutto il GS del dominio"""
 
     _require_supported_domain(domain)
     entries = await asyncio.to_thread(gold_standard_repository.list_by_domain, domain)

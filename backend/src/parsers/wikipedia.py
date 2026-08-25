@@ -1,3 +1,5 @@
+"""Estrae il contenuto utile da Wikipedia"""
+
 import html
 import re
 from urllib.parse import urlparse, unquote
@@ -8,15 +10,7 @@ from ..utils.cleaning import remove_markup, normalize_whitespace
 
 
 class WikipediaParser(Parser):
-    """Parser per le pagine di en.wikipedia.org
-
-    * isola il contenuto enciclopedico
-    * scarta navboxes, infoboxes e apparato bibliografico
-
-    gli excluded selectors vengono applicati in preprocessing via beautiful soup (non crawl4ai) per proteggere i tail text degli inline
-    
-    include regole di pulizia specifiche per link IPA, note a fine di pagina, formule latex renderizzate come immagini, e taglio alle sezioni terminali
-    """
+    """Parser per le pagine di en.wikipedia.org"""
 
 # ---------------------------------- SELETTORI ----------------------------------
 
@@ -66,6 +60,7 @@ class WikipediaParser(Parser):
 
 
     def __init__(self):
+        """Prepara target e preprocessing del parser Wikipedia"""
         super().__init__(
             excluded_selector="", # decompose con beautiful soup
             target_elements=self._TARGET_ELEMENTS,
@@ -74,19 +69,7 @@ class WikipediaParser(Parser):
 # ---------------------------------- METODI PUBBLICI ----------------------------------
 
     async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
-        """Applica la pipeline di fetching-preprocessing-parsing wikipedia-specifica
-        a partire dall'url o dall'html della pagina
-
-        Args:
-            url(str): url della pagina da scaricare
-            raw_html(str | None): HTML sorgente opzionale
-
-        Returns:
-            istanza di ``ParsedDocument`` con ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``
-
-        Raises:
-            CrawlError: se il fetch fallisce, se l'html grezzo non è disponibile dopo il fetch, o se il parsing va in errore per pagine malformate
-        """
+        """Applica la pipeline di fetching-preprocessing-parsing wikipedia-specifica"""
 
         try:
             if raw_html is None:
@@ -118,18 +101,7 @@ class WikipediaParser(Parser):
     
 
     def normalize(self, text: str) -> str:
-        """Applica pipeline di pulizia wikipedia-specifica al testo markdown
-        estratto da una pagina Wikipedia con crawl4ai
-
-        include il taglio delle sezioni terminali, il ripristino degli spazi,
-        la rimozione del markup residuo e la gestione delle formule matematiche
-
-        Args:
-            text(str): testo markdown grezzo generato da crawl4ai
-
-        Returns:
-            stringa di testo normalizzato
-        """
+        """Applica pipeline di pulizia wikipedia-specifica al testo markdown"""
 
         text = self._truncate_terminal_sections(text)
         text = self._unglue_whitespace(text)
@@ -143,17 +115,7 @@ class WikipediaParser(Parser):
 # ---------------------------------- HELPER PRIVATI ----------------------------------
     
     def _preprocess_html(self, raw_html: str) -> str:
-        """Rimuove dall'html raw i selettori presenti in ``_EXCLUDED_SELECTORS``
-
-        si usa beautifulsoup per decomporre i nodi corrispondenti ai selettori 
-        esclusi per evitare perdite di testo nei nodi adiacenti (come accadeva con crawl4ai)
-
-        Args:
-            raw_html(str): HTML grezzo della pagina
-
-        Returns:
-            testo HTML pulito per la conversione in md
-        """
+        """Rimuove dall html raw i selettori configurati come rumore"""
 
         soup = BeautifulSoup(raw_html, "lxml")
         for el in soup.select(self._EXCLUDED_SELECTORS):
@@ -162,14 +124,7 @@ class WikipediaParser(Parser):
     
 
     def _unglue_whitespace(self, text: str) -> str:
-        """Ripristina gli spazi divorati dal md converter di crawl4ai sugli snippet di codice e sui ref link
-        
-        Args:
-            text(str): testo markdown con potenziali errori di spaziatura
-
-        Returns:
-            testo con spaziature ripristinate
-        """
+        """Ripristina gli spazi divorati dal md converter di crawl4ai sugli snippet di codice e sui ref link"""
 
         text = self._RE_BACKTICK_GLUE.sub(r'\1 ', text)
         text = self._RE_LINK_GLUE.sub(' ', text)
@@ -177,14 +132,7 @@ class WikipediaParser(Parser):
     
 
     def _normalize_wiki_links(self, text: str) -> str:
-        """Converte link IPA con alfabeto fonetico e cancella i bracket link del footnote
-
-        Args:
-            text(str): markdown con link IPA e bracket links
-
-        Returns:
-            markdown senza link IPA e bracket links
-        """
+        """Converte link IPA con alfabeto fonetico e cancella i bracket link del footnote"""
 
         text = self._RE_IPA_LINK.sub(r'/\1/', text)
         text = self._RE_BRACKET_LINK.sub('', text)
@@ -192,22 +140,12 @@ class WikipediaParser(Parser):
     
 
     def _extract_math(self, text: str) -> tuple[str, list[str]]:
-        """Estrae formule matematiche da immagini renderizzate da wiki
-
-        * le formule vengono sostituite da token opachi ``§§MATH§§N§§`` in modo che la pipeline generica non le tocchi
-        * latex viene ricostruito da ``_restore_math`` a valle di ``normalize_whitespace``
-        * istruzioni di rendering tipo ``{\\displaystyle ...}`` vengono scartate
-
-        Args:
-            text(str): markdown contenente immagini ``![LATEX](...)``
-
-        Returns:
-            coppia (testo con token al posto delle formule, lista dei latex estratti)
-        """
+        """Estrae formule matematiche da immagini renderizzate da wiki"""
 
         store: list[str] = []
 
         def stash(m: re.Match) -> str:
+            """Mette da parte una formula e lascia un token temporaneo"""
             latex = html.unescape(m.group(1))
             latex = latex.replace('\\\\', '\\')
             unwrapped = self._RE_MATH_STYLE_WRAPPER.match(latex)
@@ -220,17 +158,10 @@ class WikipediaParser(Parser):
 
 
     def _restore_math(self, text: str, store: list[str]) -> str:
-        """Sostituisce i token opachi ``§§MATH§§N§§`` con la relativa sintassi latex tra ``$...$``
-        
-        Args:
-            text(str): testo normalizzato contenente token opachi
-            store(list[str]): lista delle formule latex estratte da  ``_extract_math``
-
-        Returns:
-            testo finale con formule matematiche ripristinate
-        """
+        """Rimette la sintassi latex al posto dei token matematici temporanei"""
 
         def replace(m: re.Match) -> str:
+            """Rimette la formula associata al token temporaneo"""
             idx = int(m.group(1))
             if idx >= len(store):
                 return ''
@@ -240,35 +171,13 @@ class WikipediaParser(Parser):
     
 
     def _truncate_terminal_sections(self, text: str) -> str:
-        """Taglia il testo alla prima sezione terminale (note, references, ...)
-        
-        le sezioni terminali a partire da cui viene troncato il testo sono definite in ``_RE_TERMINAL_SECTIONS``
-
-        Args:
-            text(str): testo informativo con sezioni terminali
-
-        Returns:
-            testo senza sezioni terminali
-        """
+        """Taglia il testo alla prima sezione terminale riconosciuta"""
 
         return self._RE_TERMINAL_SECTIONS.split(text, maxsplit=1)[0]
     
 
     def _extract_title(self, url: str) -> str:
-        """Deduce il titolo della voce dall' URL di Wikipedia
-
-        è possibile estrarre il titolo direttamente dall'URL perché wiki non ha URL opachi
-        
-        Example:
-            >>> _extract_title("https://en.wikipedia.org/wiki/Terry_A._Davis")
-            Terry A. Davis
-
-        Args:
-            url(str): URL completo della pagina
-
-        Returns:
-            il titolo della pagina formattato correttamente
-        """
+        """Deduce il titolo della voce dall' URL di Wikipedia"""
 
         path = urlparse(url).path
         if "/wiki/" in path:

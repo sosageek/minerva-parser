@@ -1,3 +1,5 @@
+"""Estrae il contenuto utile da The Booker Prizes"""
+
 import re
 from crawl4ai import CrawlResult
 from urllib.parse import urlparse, unquote
@@ -7,15 +9,7 @@ from ..utils.cleaning import remove_markup, normalize_whitespace
 
 
 class BookerParser(Parser):
-    """Parser per le pagine di thebookerprizes.com
-
-    * isola il contenuto editoriale di news, profili autori e schede libro nel ``main`` (e ``main-page-content`` quando il template lo usa)
-    * scarta i widget promozionali: teaser grid, carousel youtube/slice/media, asymmetric/vertical teaser, ...
-
-    gli excluded selectors vengono passati direttamente a crawl4ai (non via beautiful soup come per wikipedia) perché qui i nodi da rimuovere sono section block-level e non mangiano il tail text adiacente
-
-    in `normalize` include regole di pulizia per il rumore di formattazione che il md converter di crawl4ai lascia
-    """
+    """Parser per le pagine di thebookerprizes.com"""
 
 # ---------------------------------- SELETTORI ----------------------------------
 
@@ -47,6 +41,7 @@ class BookerParser(Parser):
     _RE_CONSECUTIVE_DUPS = re.compile(r'^(.+)(\n\1)+$', re.MULTILINE)
 
     def __init__(self):
+        """Prepara selettori e target del parser Booker"""
         super().__init__(
             target_elements=self._TARGET_ELEMENTS,
             excluded_selector=self._EXCLUDED_SELECTORS,
@@ -55,19 +50,7 @@ class BookerParser(Parser):
 # ---------------------------------- METODI PUBBLICI ----------------------------------
 
     async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
-        """Applica la pipeline di fetching-parsing specifica per thebookerprizes.com
-        a partire dall'url o dall'html della pagina
-
-        Args:
-            url(str): url della pagina da scaricare
-            raw_html(str | None): HTML sorgente opzionale
-
-        Returns:
-            istanza di ``ParsedDocument`` con ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``
-
-        Raises:
-            CrawlError: se il fetch della pagina fallisce (lo lancia la chiamata interna a ``_fetch``)
-        """
+        """Applica la pipeline di fetching-parsing specifica per thebookerprizes.com"""
         
         result = await self._fetch(url, raw_html=raw_html)
         final_url = url if raw_html is not None else (getattr(result, "url", None) or url)
@@ -82,17 +65,7 @@ class BookerParser(Parser):
 
     
     def normalize(self, text: str) -> str:
-        """Applica pipeline di pulizia specifica al testo markdown
-        estratto da una pagina thebookerprizes.com con crawl4ai
-
-        include lo strip per riga (il template del cms indenta tutto), la rimozione del markup md residuo, il dedup di righe consecutive identiche (i widget ripetono headline + cta vicine) e la normalizzazione finale dello whitespace
-
-        Args:
-            text(str): testo markdown grezzo generato da crawl4ai
-
-        Returns:
-            stringa di testo markdown normalizzato
-        """
+        """Applica pipeline di pulizia specifica al testo markdown"""
 
         text = "\n".join(line.strip() for line in text.split('\n'))
         text = remove_markup(text)
@@ -101,19 +74,7 @@ class BookerParser(Parser):
 
 
     def _extract_title(self, result: CrawlResult, url: str) -> str:
-        """Estrae il titolo della pagina
-
-        * preferisce il contenuto del tag ``<title>`` html
-        * se il titolo non è disponibile usa l'ultimo segmento del path come fallback
-        (che su thebookerprizes non è particolarmente opaco)
-
-        Args:
-            result(CrawlResult): risultato di crawl4ai con il metadata del tag ``<title>``
-            url(str): URL completo della pagina (usato come fallback)
-
-        Returns:
-            il titolo della pagina pulito dal suffisso, o un fallback estratto dall' URL
-        """
+        """Estrae il titolo della pagina"""
 
         metadata = getattr(result, "metadata", None)
         title = metadata.get("title") if isinstance(metadata, dict) else None

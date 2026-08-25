@@ -1,3 +1,5 @@
+"""Parla con il server locale di Ollama"""
+
 import json
 import logging
 import time
@@ -21,12 +23,7 @@ _supports_think: dict[str, bool] = {}
 
 
 def _post(payload: dict, timeout: float) -> dict:
-    """Esegue la POST a /api/generate
-
-    Raises:
-        urllib.error.HTTPError: risposta 4xx o 5xx
-        urllib.error.URLError: server irraggiungibile
-    """
+    """Esegue la POST a /api/generate"""
     request = urllib.request.Request(
         f"{OLLAMA_URL}/api/generate",
         data=json.dumps(payload).encode("utf-8"),
@@ -45,22 +42,7 @@ def generate(
     model: str = OLLAMA_MODEL,
     timeout: float = OLLAMA_TIMEOUT,
 ) -> tuple[str, float]:
-    """Invia il prompt al modello e restituisce la risposta grezza
-
-    Il modello è vincolato a produrre JSON sintatticamente valido tramite
-    ``format`` e reso riproducibile da ``temperature`` a zero.
-
-    Args:
-        prompt: prompt completo
-        model: tag Ollama del modello
-        timeout: secondi di attesa massima
-
-    Returns:
-        tupla ``(testo della risposta, secondi impiegati)``
-
-    Raises:
-        OllamaError: server irraggiungibile, modello assente o timeout
-    """
+    """Invia il prompt al modello e restituisce la risposta grezza"""
     payload = {
         "model": model,
         "prompt": prompt,

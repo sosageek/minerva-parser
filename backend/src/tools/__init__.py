@@ -1,1 +1,1 @@
-"""Utility operative del backend, non importate dal runtime API."""
+"""Utility operative del backend, non importate dal runtime API"""

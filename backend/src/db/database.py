@@ -1,3 +1,5 @@
+"""Gestisce il pool di connessioni MariaDB"""
+
 import logging
 import mariadb
 
@@ -47,11 +49,7 @@ def create_pool() -> None:
 
 
 def get_connection() -> mariadb.Connection:
-    """Preleva una connessione dal pool
-
-        è un wrapper di `_pool.get_connection()` con controllo
-        sull'esistenza del pool
-    """
+    """Preleva una connessione dal pool"""
 
     if _pool is None:
         raise RuntimeError("Database pool non inizializzato")

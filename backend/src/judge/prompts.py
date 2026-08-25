@@ -1,3 +1,5 @@
+"""Costruisce il prompt inviato al Judge"""
+
 # Limite di caratteri per ciascuno dei due testi inviati al modello.
 # La specifica consente esplicitamente il troncamento per limitare i tempi di
 # attesa, e qui serve davvero: a 1500 caratteri il judge costa circa 21s per
@@ -47,18 +49,7 @@ REPAIR_SUFFIX: str = (
 
 
 def truncate(text: str, limit: int = MAX_CHARS) -> str:
-    """Tronca il testo senza spezzare l'ultima parola
-
-    Tagliare a meta' parola produce frammenti che il modello segnala come
-    anomalie del parser, penalizzando un difetto introdotto da noi.
-
-    Args:
-        text: testo da troncare
-        limit: numero massimo di caratteri
-
-    Returns:
-        testo troncato, con marcatore di continuazione se accorciato
-    """
+    """Tronca il testo senza spezzare l'ultima parola"""
     if len(text) <= limit:
         return text
     cut = text[:limit]
@@ -67,15 +58,7 @@ def truncate(text: str, limit: int = MAX_CHARS) -> str:
 
 
 def build_prompt(parsed_text: str, gold_text: str) -> str:
-    """Compone il prompt con i due testi già troncati
-
-    Args:
-        parsed_text: testo prodotto dal parser, senza markdown
-        gold_text: testo di riferimento, senza markdown
-
-    Returns:
-        prompt completo da inviare al modello
-    """
+    """Compone il prompt con i due testi già troncati"""
     return JUDGE_PROMPT.format(
         parsed_text=truncate(parsed_text),
         gold_text=truncate(gold_text),

@@ -1,3 +1,5 @@
+"""Legge lo schema reale di MariaDB"""
+
 from ..database import get_connection
 
 

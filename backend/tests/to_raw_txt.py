@@ -1,6 +1,9 @@
+"""Converte i file di test in testo grezzo"""
+
 import sys
 
 def rendi_raw_file(nome_file_input):
+    """Converte un file di test nel formato grezzo"""
     nome_file_output = f"{nome_file_input}_raw.txt"
 
     try:

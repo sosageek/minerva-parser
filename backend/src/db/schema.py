@@ -1,3 +1,5 @@
+"""Crea lo schema MariaDB del progetto"""
+
 import logging
 
 import mariadb

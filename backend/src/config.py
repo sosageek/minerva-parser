@@ -1,3 +1,5 @@
+"""Tiene insieme la configurazione condivisa del backend"""
+
 import logging
 import os
 from pathlib import Path
@@ -40,10 +42,7 @@ STATUS_CHECK_TIMEOUT: float = float(os.environ.get("STATUS_CHECK_TIMEOUT", "1.0"
 
 
 def configure_logging() -> None:
-    """Inizializza logger con formato e livello coerenti
-
-    ``force=True`` sovrascrive eventuali configurazioni precedenti
-    """
+    """Inizializza logger con formato e livello coerenti"""
     logging.basicConfig(
         level=LOG_LEVEL,
         format=LOG_FORMAT,

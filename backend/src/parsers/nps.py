@@ -1,3 +1,5 @@
+"""Estrae il contenuto utile da National Park Service"""
+
 import re
 from crawl4ai import CrawlResult
 from urllib.parse import urlparse, unquote
@@ -7,15 +9,7 @@ from ..utils.cleaning import remove_markup, normalize_whitespace
 
 
 class NpsParser(Parser):
-    """Parser per le pagine di nps.gov
-
-    * isola il contenuto gold delle park pages
-    * scarta il cms(?) attorno: modali, video player, caroselli, promo e moduli di feedback
-
-    gli excluded selectors vengono passati direttamente a crawl4ai (non via beautiful soup come per wikipedia) perché qui i nodi da rimuovere sono abbastanza self-contained da non mangiare il tail text adiacente
-
-    include regole di pulizia specifiche per promo social inline, suffissi ricorrenti, URL residui nel md, e taglio alle sezioni terminali tipiche (Contact Us, Related Links, ecc)
-    """
+    """Parser per le pagine di nps.gov"""
 # ---------------------------------- SELETTORI ----------------------------------
 
     _EXCLUDED_SELECTORS = (
@@ -75,6 +69,7 @@ class NpsParser(Parser):
 
 
     def __init__(self):
+        """Prepara selettori e target del parser NPS"""
         super().__init__(
             excluded_selector=self._EXCLUDED_SELECTORS,
             target_elements=self._TARGET_ELEMENTS,
@@ -83,19 +78,7 @@ class NpsParser(Parser):
 # ---------------------------------- METODI PUBBLICI ----------------------------------
 
     async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
-        """Applica la pipeline di fetching-parsing specifica per nps.gov
-        a partire dall'url o dall'html della pagina
-
-        Args:
-            url(str): url della pagina da scaricare
-            raw_html(str | None): HTML sorgente opzionale
-
-        Returns:
-            istanza di ``ParsedDocument`` con ``url``, ``domain``, ``title``, ``html_text`` e ``parsed_text``
-
-        Raises:
-            CrawlError: se il fetch della pagina fallisce (lo lancia la chiamata interna a ``_fetch``)
-        """
+        """Applica la pipeline di fetching-parsing specifica per nps.gov"""
 
         result = await self._fetch(url, raw_html=raw_html)
         final_url = url if raw_html is not None else (getattr(result, "url", None) or url)
@@ -110,18 +93,7 @@ class NpsParser(Parser):
 
 
     def normalize(self, text: str) -> str:
-        """Applica pipeline di pulizia specifica al testo markdown
-        estratto da una pagina nps.gov con crawl4ai
-
-        include il taglio delle sezioni terminali, la rimozione di metadati di footer,
-        la cancellazione degli URL residui e la pulizia di promo e altra spazzatura inserita da editor 
-
-        Args:
-            text (str): testo markdown grezzo generato da crawl4ai
-
-        Returns:
-            stringa di testo normalizzato
-        """
+        """Applica pipeline di pulizia specifica al testo markdown"""
 
         text = self._RE_TERMINAL_SECTIONS.split(text, maxsplit=1)[0]
         text = self._RE_LAST_UPDATED.sub('', text)
@@ -142,17 +114,7 @@ class NpsParser(Parser):
 # ---------------------------------- HELPER PRIVATI ----------------------------------
 
     def _remove_urls(self, text: str) -> str:
-        """Cancella URL residui sia tra parentesi tonde sia nudi nel testo
-
-        nps.gov ogni tanto lascia URL inline direttamente nel contenuto dei paragrafi
-        (e non dentro i tag giusti)
-
-        Args:
-            text(str): markdown con URL residui
-
-        Returns:
-            testo senza URL
-        """
+        """Cancella URL residui sia tra parentesi tonde sia nudi nel testo"""
 
         text = self._RE_URL_PAREN.sub('', text)
         text = self._RE_URL_BARE.sub('', text)
@@ -160,21 +122,7 @@ class NpsParser(Parser):
 
 
     def _extract_title(self, result: CrawlResult, url: str) -> str:
-        """Estrae il titolo della pagina
-
-        * preferisce il contenuto del tag ``<title>`` html
-        (perché a quanto pare gli url di nps.gov sono opachi a differenza di wikipedia)
-        * rimuove il suffisso ricorrente U.S. National Park Service
-
-        se il titolo non è disponibile usa ultimo segmento del path come fallback, come ultima risorsa una stringa placeholder
-
-        Args:
-            result(CrawlResult): risultato di crawl4ai con il metadata del tag ``<title>``
-            url(str): URL completo della pagina (usato come fallback)
-
-        Returns:
-            il titolo della pagina pulito dal suffisso, o un fallback estratto dall' URL
-        """
+        """Estrae il titolo della pagina"""
 
         metadata = getattr(result, "metadata", None)
         title = metadata.get("title") if isinstance(metadata, dict) else None

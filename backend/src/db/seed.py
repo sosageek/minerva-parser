@@ -1,3 +1,5 @@
+"""Valida e carica i dati iniziali del progetto"""
+
 import json
 import logging
 from pathlib import Path
@@ -57,10 +59,7 @@ ON DUPLICATE KEY UPDATE
 """
 
 def _load_seed_entries() -> list[dict[str, str]]:
-    """Legge e valida le entry contenute nei file Gold Standard
-    
-        Controlla se la struttura è corretta ed eventuali duplicati nei GS
-    """
+    """Legge e valida le entry contenute nei file Gold Standard"""
 
     json_files = sorted(GS_DATA_DIR.glob("*_gs.json"))
 
@@ -191,7 +190,7 @@ def seed_gold_standards() -> None:
 
 
 def _require_number(value: Any, field: str, index: int) -> float:
-    """Valida e converte una metrica numerica compresa tra zero e uno."""
+    """Valida e converte una metrica numerica compresa tra zero e uno"""
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ValueError(f"Entry precomputata {index}: '{field}' non numerico")
@@ -205,7 +204,7 @@ def _load_precomputed_results() -> tuple[
     list[evaluation_results.EvaluationResult],
     list[judge_results.PersistedJudgeResult],
 ]:
-    """Legge e valida metriche e giudizi precalcolati delle 41 entry GS."""
+    """Legge e valida metriche e giudizi precalcolati delle 41 entry GS"""
 
     raw_entries = _read_json_file(PRECOMPUTED_RESULTS_FILE)
     expected_urls = {entry["url"] for entry in _load_seed_entries()}
@@ -304,7 +303,7 @@ def _load_precomputed_results() -> tuple[
 
 
 def seed_precomputed_results() -> None:
-    """Popola metriche e Judge reali senza invocare Ollama durante le API."""
+    """Popola metriche e Judge reali senza invocare Ollama durante le API"""
 
     evaluations, judges = _load_precomputed_results()
     evaluation_results.upsert_many(evaluations)

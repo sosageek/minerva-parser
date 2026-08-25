@@ -1,3 +1,5 @@
+"""Salva e legge i risultati del Judge"""
+
 from typing import TypedDict
 
 import mariadb
@@ -6,6 +8,7 @@ from ..database import get_connection
 
 
 class PersistedJudgeResult(TypedDict):
+    """Descrive un giudizio pronto per MariaDB"""
     url: str
     model_name: str
     judge_score: int
@@ -15,13 +18,13 @@ class PersistedJudgeResult(TypedDict):
 
 
 def upsert(result: PersistedJudgeResult) -> None:
-    """Inserisce o aggiorna il giudizio corrente di un GS."""
+    """Inserisce o aggiorna il giudizio corrente di un GS"""
 
     upsert_many([result])
 
 
 def upsert_many(results: list[PersistedJudgeResult]) -> None:
-    """Inserisce o aggiorna più giudizi in una sola transazione."""
+    """Inserisce o aggiorna più giudizi in una sola transazione"""
 
     if not results:
         return
@@ -69,7 +72,7 @@ def upsert_many(results: list[PersistedJudgeResult]) -> None:
 
 
 def get_by_url(url: str) -> PersistedJudgeResult | None:
-    """Restituisce il giudizio persistito per URL."""
+    """Restituisce il giudizio persistito per URL"""
 
     connection = get_connection()
     cursor = connection.cursor(dictionary=True)
@@ -95,7 +98,7 @@ def get_by_url(url: str) -> PersistedJudgeResult | None:
 
 
 def averages_by_domain() -> dict[str, dict[str, float | int]]:
-    """Aggrega i punteggi Judge persistiti per dominio."""
+    """Aggrega i punteggi Judge persistiti per dominio"""
 
     connection = get_connection()
     cursor = connection.cursor()

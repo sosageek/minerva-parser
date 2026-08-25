@@ -1,3 +1,5 @@
+"""Definisce i contratti pubblici delle API"""
+
 from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, RootModel
 
@@ -6,7 +8,7 @@ ServiceStatus = Literal["ok", "error"]
 
 
 class StatusOutput(BaseModel):
-    """Stato del backend e dei servizi esterni usati dall'applicazione."""
+    """Stato del backend e dei servizi esterni usati dall'applicazione"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -20,14 +22,7 @@ class DBSchema(RootModel[dict[str, dict[str, str]]]):
 
 
 class DBStats(BaseModel):
-    """Output di GET /db_stats
-
-    Attributes:
-        web_resources(dict[str, int]): numero di risorse per dominio
-        gold_standard(dict[str, int]): numero di GS per dominio
-        avg_eval(dict[str, dict[str, Any]]): metriche medie salvate nel database
-        avg_eval_judge(dict[str, dict[str, Any]]): giudizi medi salvati nel database
-    """
+    """Output di GET /db_stats"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -42,12 +37,7 @@ class DBStats(BaseModel):
 
 
 class ParseInput(BaseModel):
-    """Body di POST /parse
-
-    Attributes:
-        url(str): URL sorgente
-        local(bool): se True usa l'HTML salvato nel database
-    """
+    """Body di POST /parse"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -56,15 +46,7 @@ class ParseInput(BaseModel):
 
 
 class ParseOutput(BaseModel):
-    """Output di GET /parse e POST /parse
-
-    Attributes:
-        url(str): URL sorgente documento parsato
-        domain(str): netloc dominio
-        title(str): titolo estratto
-        html_text(str): HTML pulito restituito dal crawler (input del parser)
-        parsed_text(str): testo pulito in formato markdown (output del parser)
-    """
+    """Output di GET /parse e POST /parse"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -76,11 +58,7 @@ class ParseOutput(BaseModel):
 
 
 class SupportedDomains(BaseModel):
-    """Output di GET /domains: lista dei domini supportati dal sistema
-    
-    Attributes:
-        domains(list[str]): lista dei domini
-    """
+    """Output di GET /domains: lista dei domini supportati dal sistema"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -88,17 +66,7 @@ class SupportedDomains(BaseModel):
 
 
 class GSEntry(BaseModel):
-    """Entry singola del GS (output di GET /gold_standard)
-
-    nota: il campo ``gold_text`` è plain text senza markdown, al posto di ``parsed_text`` di ``ParseOutput``.
-
-    Attributes:
-        url(str): URL della pagina
-        domain(str): netloc dominio
-        title(str): titolo gold
-        html_text(str): HTML gold
-        gold_text(str): testo gold di riferimento per evaluation
-    """
+    """Descrive una singola entry restituita dal Gold Standard"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -110,11 +78,7 @@ class GSEntry(BaseModel):
 
 
 class ListGSEntry(BaseModel):
-    """Output di GET /full_gold_standard: tutte le entry del GS di un dominio
-    
-    Attributes:
-        gold_standard(list[GSEntry]): lista delle entry del GS di un dominio
-    """
+    """Output di GET /full_gold_standard: tutte le entry del GS di un dominio"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -122,11 +86,7 @@ class ListGSEntry(BaseModel):
 
 
 class GoldStandardURLs(BaseModel):
-    """Output di GET /gold_standard_urls
-
-    Attributes:
-        gold_standard_urls(list[str]): lista degli URL presenti nel GS
-    """
+    """Output di GET /gold_standard_urls"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -134,12 +94,7 @@ class GoldStandardURLs(BaseModel):
 
 
 class WebResourceInput(BaseModel):
-    """Body di POST /add_web_resource
-
-    Attributes:
-        url(str): URL della risorsa
-        html_text(str): HTML grezzo da salvare nel database
-    """
+    """Body di POST /add_web_resource"""
 
     model_config = ConfigDict(extra="ignore")
 
@@ -148,12 +103,7 @@ class WebResourceInput(BaseModel):
 
 
 class GoldStandardInput(BaseModel):
-    """Body di POST /add_gold_standard
-
-    Attributes:
-        url(str): URL della web resource associata
-        gold_text(str): testo gold da salvare nel database
-    """
+    """Body di POST /add_gold_standard"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -162,11 +112,7 @@ class GoldStandardInput(BaseModel):
 
 
 class URLInput(BaseModel):
-    """Body degli endpoint DELETE
-
-    Attributes:
-        url(str): URL dell'elemento da cancellare
-    """
+    """Body degli endpoint DELETE"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -174,11 +120,7 @@ class URLInput(BaseModel):
 
 
 class CRUDStatus(BaseModel):
-    """Output degli endpoint CRUD
-
-    Attributes:
-        status(str): esito dell'operazione
-    """
+    """Output degli endpoint CRUD"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -186,12 +128,7 @@ class CRUDStatus(BaseModel):
 
 
 class EvaluationInput(BaseModel):
-    """Body di POST /evaluate
-    
-    Attributes:
-        parsed_text(str): testo estratto da valutare
-        gold_text(str): gold text di riferimento
-    """
+    """Body di POST /evaluate"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -200,7 +137,7 @@ class EvaluationInput(BaseModel):
 
 
 class JudgeEvaluation(BaseModel):
-    """Risposta pubblica di POST /evaluate_judge."""
+    """Risposta pubblica di POST /evaluate_judge"""
 
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 
@@ -212,15 +149,7 @@ class JudgeEvaluation(BaseModel):
 
 
 class TokenLevelEval(BaseModel):
-    """Metriche token-level (precision, recall, f1)
-
-    Attributes:
-        precision(float): |token_parsed ∩ token_gold| / |token_parsed|
-        recall(float): |token_parsed ∩ token_gold| / |token_gold|
-        f1(float): (2 * precision * recall) / (precision + recall)
-
-    nota: attributi corrispondono 1:1 ai campi del dict restituito da `TokenLevelEvaluator`
-    """
+    """Raccoglie precision recall e f1 a livello di token"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -230,15 +159,7 @@ class TokenLevelEval(BaseModel):
 
 
 class ParseEvaluation(BaseModel):
-    """Output di POST /evaluate e GET /full_gs_eval
-
-    Attributes:
-        token_level_eval(TokenLevelEval): struttura delle metriche token-level di default (precision, recall, f1)
-        x_eval(dict[str, Any]): dizionario per metriche di evaluation alternative
-
-    * campo ``token_level_eval`` è obbligatorio
-    * ``x_eval`` è uno schema aperto
-    """
+    """Output di POST /evaluate e GET /full_gs_eval"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -247,6 +168,6 @@ class ParseEvaluation(BaseModel):
 
 
 class FullParseEvaluation(ParseEvaluation):
-    """Evaluation aggregata, comprensiva del Judge precalcolato."""
+    """Evaluation aggregata, comprensiva del Judge precalcolato"""
 
     judge_score: float = Field(ge=1, le=5)

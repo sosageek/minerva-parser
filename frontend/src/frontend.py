@@ -1,3 +1,5 @@
+"""Renderizza le quattro pagine usando soltanto le API del backend"""
+
 import logging
 import os
 from pathlib import Path
@@ -48,16 +50,7 @@ DOMAIN_LABELS: dict[str, str] = {
 
 
 def _extract_domain(url: str) -> str | None:
-    """
-    Estrae il netloc da un URL se ben formato e con schema http/https valido.
-
-    Args:
-        url: stringa contenente l'URL da analizzare.
-
-    Returns:
-        Il netloc dell'URL se lo schema è http o https e il netloc è presente;
-        altrimenti None.
-    """
+    """Estrae il netloc da un URL se ben formato e con schema http/https valido"""
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         return None 
@@ -65,15 +58,7 @@ def _extract_domain(url: str) -> str | None:
 
 
 def _error_detail(resp: httpx.Response) -> str:
-    """
-    Estrae un messaggio d'errore leggibile da una risposta non-2xx del backend.
-
-    Args:
-        resp: risposta HTTP del backend con status code >= 400.
-
-    Returns:
-        Il campo "detail" se la risposta è JSON, altrimenti il body grezzo.
-    """
+    """Estrae un messaggio d'errore leggibile da una risposta non-2xx del backend"""
     try:
         return resp.json().get("detail", resp.text)
     except ValueError:
@@ -81,16 +66,7 @@ def _error_detail(resp: httpx.Response) -> str:
 
 
 async def _fetch_domains(client: httpx.AsyncClient) -> list[str]:
-    """
-    Recupera i domini supportati dal backend.
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare la richiesta asincrona.
-
-    Returns:
-        Lista di stringhe con i domini (netloc) restituiti dal backend, o una
-        lista vuota se la richiesta non risponde o fallisce.
-    """
+    """Recupera i domini supportati dal backend"""
     try:
         resp = await client.get(f"{BACKEND_URL}/domains")
         resp.raise_for_status()
@@ -101,16 +77,7 @@ async def _fetch_domains(client: httpx.AsyncClient) -> list[str]:
 
 
 async def _fetch_status(client: httpx.AsyncClient) -> dict | None:
-    """
-    Recupera lo stato di backend/database/ollama.
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare la richiesta asincrona.
-
-    Returns:
-        dict con le chiavi "backend", "database", "ollama" (valori "ok"/"error"),
-        oppure None se il backend stesso non è raggiungibile.
-    """
+    """Recupera lo stato di backend/database/ollama"""
     try:
         resp = await client.get(f"{BACKEND_URL}/status")
         resp.raise_for_status()
@@ -124,16 +91,7 @@ async def _fetch_gold_standard_urls(
     client: httpx.AsyncClient,
     domain: str,
 ) -> list[str]:
-    """
-    Recupera solo gli URL del Gold Standard per un dominio (senza html/gold text)
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare la richiesta asincrona.
-        domain: dominio per cui filtrare gli URL.
-
-    Returns:
-        Lista di URL, o lista vuota in caso di errore.
-    """
+    """Recupera gli URL del Gold Standard per un dominio"""
     try:
         resp = await client.get(
             f"{BACKEND_URL}/gold_standard_urls",
@@ -150,16 +108,7 @@ async def _fetch_gs_urls_by_domain(
     client: httpx.AsyncClient,
     domains: list[str],
 ) -> dict[str, list[str]]:
-    """
-    Costruisce la mappa dominio -> lista di URL GS, usata dal cascading select.
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare le richieste asincrone.
-        domains: lista di domini supportati.
-
-    Returns:
-        dict[str, list[str]] con un URL grezzo (senza titolo) per entry.
-    """
+    """Costruisce la mappa dominio -> lista di URL GS, usata dal cascading select"""
     return {domain: await _fetch_gold_standard_urls(client, domain) for domain in domains}
 
 
@@ -167,17 +116,7 @@ async def _fetch_gold_standard(
     client: httpx.AsyncClient,
     url: str,
 ) -> dict | None:
-    """
-    Recupera l'entry del Gold Standard per un URL specifico, se esiste.
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare la richiesta asincrona.
-        url: URL per cui cercare l'entry.
-
-    Returns:
-        dict con l'entry (url, domain, title, html_text, gold_text) se trovata,
-        None se l'URL non è nel Gold Standard o se il backend non risponde.
-    """
+    """Recupera l'entry del Gold Standard per un URL specifico, se esiste"""
     try:
         resp = await client.get(f"{BACKEND_URL}/gold_standard", params={"url": url})
         if resp.status_code == 404:
@@ -194,18 +133,7 @@ async def _do_parse(
     url: str,
     local: bool,
 ) -> tuple[dict | None, str | None]:
-    """
-    Esegue POST /parse in modalità Live o Local.
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare la richiesta asincrona.
-        url: URL da parsare.
-        local: True per leggere solo l'HTML già salvato nel database, senza rete.
-
-    Returns:
-        tuple (ParseOutput come dict, None) in caso di successo,
-        oppure (None, messaggio d'errore leggibile) in caso di fallimento.
-    """
+    """Esegue POST /parse in modalità Live o Local"""
     try:
         resp = await client.post(
             f"{BACKEND_URL}/parse",
@@ -224,17 +152,7 @@ async def _do_evaluate(
     parsed_text: str,
     gold_text: str,
 ) -> dict | None:
-    """
-    Calcola le metriche deterministiche tra parsed_text e gold_text.
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare la richiesta asincrona.
-        parsed_text: testo estratto dal parser.
-        gold_text: testo di riferimento.
-
-    Returns:
-        dict con token_level_eval e x_eval, oppure None se la chiamata fallisce.
-    """
+    """Calcola le metriche deterministiche tra parsed_text e gold_text"""
     try:
         resp = await client.post(
             f"{BACKEND_URL}/evaluate",
@@ -252,18 +170,7 @@ async def _do_evaluate_judge(
     parsed_text: str,
     gold_text: str,
 ) -> tuple[dict | None, str | None]:
-    """
-    Richiede la valutazione al modello LLM judge
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare la richiesta asincrona.
-        parsed_text: testo estratto dal parser.
-        gold_text: testo di riferimento.
-
-    Returns:
-        tuple (JudgeEvaluation come dict, None) in caso di successo,
-        oppure (None, messaggio d'errore leggibile) in caso di fallimento.
-    """
+    """Richiede la valutazione al modello LLM judge"""
     try:
         resp = await client.post(
             f"{BACKEND_URL}/evaluate_judge",
@@ -282,18 +189,7 @@ async def _add_gold_standard(
     url: str,
     gold_text: str,
 ) -> dict:
-    """
-    Salva o aggiorna il Gold Standard per una URL.
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare la richiesta asincrona.
-        url: URL della web resource già salvata.
-        gold_text: testo gold da salvare.
-
-    Returns:
-        dict {"status": "ok"|"error"}; "error" anche se il backend è
-        irraggiungibile, così il template non deve distinguere i due casi.
-    """
+    """Salva o aggiorna il Gold Standard per una URL"""
     try:
         resp = await client.post(
             f"{BACKEND_URL}/add_gold_standard",
@@ -307,7 +203,7 @@ async def _add_gold_standard(
 
 
 async def _delete_gold_standard(client: httpx.AsyncClient, url: str) -> dict:
-    """Elimina solo il Gold Standard di una URL, lasciando la web resource."""
+    """Elimina solo il Gold Standard di una URL, lasciando la web resource"""
     try:
         resp = await client.request(
             "DELETE",
@@ -322,7 +218,7 @@ async def _delete_gold_standard(client: httpx.AsyncClient, url: str) -> dict:
 
 
 async def _delete_web_resource(client: httpx.AsyncClient, url: str) -> dict:
-    """Elimina la web resource e, a cascata, l'eventuale Gold Standard collegato."""
+    """Elimina la web resource e, a cascata, l'eventuale Gold Standard collegato"""
     try:
         resp = await client.request(
             "DELETE",
@@ -339,16 +235,7 @@ async def _delete_web_resource(client: httpx.AsyncClient, url: str) -> dict:
 async def _fetch_db_stats(
     client: httpx.AsyncClient,
 ) -> tuple[dict | None, str | None]:
-    """
-    Recupera conteggi e medie persistite per dominio.
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare la richiesta asincrona.
-
-    Returns:
-        tuple (DBStats come dict, None) in caso di successo,
-        oppure (None, messaggio d'errore leggibile) in caso di fallimento.
-    """
+    """Recupera conteggi e medie persistite per dominio"""
     try:
         resp = await client.get(f"{BACKEND_URL}/db_stats")
         resp.raise_for_status()
@@ -359,7 +246,7 @@ async def _fetch_db_stats(
 
 
 def _gold_standard_defaults(url: str = "", mode: str = "live") -> dict:
-    """Contesto di default per gold_standard.html, sovrascritto dalle singole route."""
+    """Contesto di default per gold_standard.html, sovrascritto dalle singole route"""
     return {
         "url": url,
         "mode": mode,
@@ -379,20 +266,7 @@ async def _load_gs_index(
     context: dict,
     domain: str | None = None,
 ) -> None:
-    """
-    Popola il contesto con i domini supportati e con gli URL già nel Gold Standard.
-
-    Viene chiamata da tutte le route della pagina, non solo dalla GET, così la
-    lista delle entry esistenti resta visibile anche dopo un salvataggio o una
-    cancellazione. Se il dominio non arriva o non è fra quelli supportati si
-    ricade sul primo disponibile, per non presentare una tendina vuota al primo
-    accesso.
-
-    Args:
-        client: httpx.AsyncClient usato per effettuare le richieste asincrone.
-        context: contesto del template, modificato sul posto.
-        domain: dominio scelto dall'utente, oppure None.
-    """
+    """Popola il contesto con i domini supportati e con gli URL già nel Gold Standard"""
     domains = await _fetch_domains(client)
     context["domains"] = domains
 
@@ -406,9 +280,7 @@ async def _load_gs_index(
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
-    """
-    Home: navigazione, membri del team, domini supportati e stato dei servizi.
-    """
+    """Home: navigazione, membri del team, domini supportati e stato dei servizi"""
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         domains = await _fetch_domains(client)
         status = await _fetch_status(client)
@@ -430,10 +302,7 @@ async def parser_page(
     url: str | None = Query(default=None, description="URL da parsare"),
     mode: str = Query(default="live", description="'live' o 'local'"),
 ) -> HTMLResponse:
-    """
-    Parser & Evaluation: URL o selezione dal GS, modalità Live/Local, HTML,
-    parsed text, gold text, metriche deterministiche e Judge.
-    """
+    """Mostra parsing confronto metriche e Judge in modalità Live o Local"""
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         domains = await _fetch_domains(client)
         gs_urls = await _fetch_gs_urls_by_domain(client, domains)
@@ -492,11 +361,7 @@ async def gold_standard_page(
     mode: str = Query(default="live", description="'live' o 'local'"),
     domain: str | None = Query(default=None, description="dominio di cui elencare le entry GS"),
 ) -> HTMLResponse:
-    """
-    Gold Standard Builder: selezione del dominio con le entry già presenti,
-    acquisizione HTML (Live/Local) e anteprima del parsed text come punto di
-    partenza per il gold text.
-    """
+    """Mostra e modifica le entry del Gold Standard"""
     context = _gold_standard_defaults(url or "", mode)
     context["request"] = request
     context["active_page"] = "gold_standard"
@@ -525,10 +390,7 @@ async def save_gold_standard(
     url: str = Form(...),
     gold_text: str = Form(...),
 ) -> HTMLResponse:
-    """
-    Salva il gold text inviato dal form e ri-mostra la pagina in modalità
-    Local (la web resource è già salvata, non serve un nuovo crawl).
-    """
+    """Salva il gold text e ricarica la risorsa in modalità Local"""
     context = _gold_standard_defaults(url, "local")
     context["request"] = request
     context["active_page"] = "gold_standard"
@@ -549,7 +411,7 @@ async def save_gold_standard(
 
 @app.post("/gold-standard/delete-gs", response_class=HTMLResponse)
 async def delete_gs_route(request: Request, url: str = Form(...)) -> HTMLResponse:
-    """Elimina solo il Gold Standard di una URL."""
+    """Elimina solo il Gold Standard di una URL"""
     context = _gold_standard_defaults()
     context["request"] = request
     context["active_page"] = "gold_standard"
@@ -568,7 +430,7 @@ async def delete_gs_route(request: Request, url: str = Form(...)) -> HTMLRespons
 
 @app.post("/gold-standard/delete-resource", response_class=HTMLResponse)
 async def delete_resource_route(request: Request, url: str = Form(...)) -> HTMLResponse:
-    """Elimina la web resource e, a cascata, il Gold Standard collegato."""
+    """Elimina la web resource e, a cascata, il Gold Standard collegato"""
     context = _gold_standard_defaults()
     context["request"] = request
     context["active_page"] = "gold_standard"
@@ -587,7 +449,7 @@ async def delete_resource_route(request: Request, url: str = Form(...)) -> HTMLR
 
 @app.get("/stats", response_class=HTMLResponse)
 async def stats_page(request: Request) -> HTMLResponse:
-    """Stats: conteggi, metriche medie e judge medio per dominio."""
+    """Stats: conteggi, metriche medie e judge medio per dominio"""
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
         domains = await _fetch_domains(client)
         stats, stats_error = await _fetch_db_stats(client)

@@ -1,3 +1,5 @@
+"""Espone i parser e i loro tipi condivisi"""
+
 from .wikipedia import WikipediaParser
 from .meteoam import MeteoAmParser
 from .nps import NpsParser

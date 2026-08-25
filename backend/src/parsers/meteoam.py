@@ -1,3 +1,5 @@
+"""Estrae il contenuto utile da MeteoAM"""
+
 import re
 from crawl4ai import CacheMode, CrawlerRunConfig, CrawlResult
 from urllib.parse import urlparse, unquote
@@ -7,11 +9,7 @@ from ..utils.cleaning import remove_markup, normalize_whitespace
 
 
 class MeteoAmParser(Parser):
-    """Parser per pagine di meteoam
-
-    * isola il contenuto
-    * scarta header articolo, side col, gallerie immagini, moduli potrebbe piacerti anche / articoli recenti 
-    """
+    """Parser per pagine di meteoam"""
 
 # ---------------------------------- SELETTORI ----------------------------------
 
@@ -67,6 +65,7 @@ class MeteoAmParser(Parser):
     )
 
     def __init__(self):
+        """Prepara selettori e target del parser MeteoAM"""
         super().__init__(
             excluded_selector=self._EXCLUDED_SELECTORS,
             target_elements=self._TARGET_ELEMENTS
@@ -75,18 +74,7 @@ class MeteoAmParser(Parser):
 # ---------------------------------- METODI PUBBLICI -------------------------------
 
     async def parse(self, url: str, raw_html: str | None = None) -> ParsedDocument:
-        """Applica la pipeline di parsing
-
-        Args:
-            url(str): pagina da scaricare
-            raw_html(str | None): HTML sorgente opzionale
-
-        Returns:
-            istanza di ParsedDocument con url, domain, title, html_text e parsed_text
-
-        Raises:
-            CrawlError: se il fetch della pagina fallisce (lo lancia la chiamata interna a ``_fetch``)
-        """
+        """Applica la pipeline di parsing"""
 
         # /meteosat ha 5 widget gallery che si idratano lato client: senza delay
         # mancano i loro <h2>. Solo qui paghiamo 3s, gli altri URL restano veloci. (Mazz)
@@ -107,17 +95,7 @@ class MeteoAmParser(Parser):
         )
 
     def normalize(self, text: str) -> str:
-        """Applica pipeline di pulizia al testo markdown
-
-        include rimozione del link "torna agli articoli", il taglio della coda "potrebbe piacerti anche" residua,
-        cancellazione del sottotitolo "Galleria Fotografica" rimasto orfano e la pulizia del markup md generale
-
-        Args:
-            text(str): testo markdown grezzo da crawl4ai
-
-        Returns:
-            stringa di testo normalizzato
-        """
+        """Applica pipeline di pulizia al testo markdown"""
 
         # crawl4ai a volte mette nbsp (\xa0) che NON viene matchato da \s in alcune
         # combinazioni regex: formatta a spazio ascii per sicurezza (Mazz)
@@ -138,14 +116,7 @@ class MeteoAmParser(Parser):
 
 
     def _fallback_config(self) -> CrawlerRunConfig:
-        """Config alternativa per pagine meteoam senza section#details_news_page
-
-        nota: stessi excluded selectors e stessi excluded tags della config principale,
-        ma target_elements vuoto così crawl4ai estrae tutto il body al netto di nav/aside
-
-        Returns:
-            CrawlerRunConfig da usare come secondo tentativo se primo torna vuoto
-        """
+        """Config alternativa per pagine meteoam senza section#details_news_page"""
 
         return CrawlerRunConfig(
             cache_mode=CacheMode.BYPASS,
@@ -156,19 +127,7 @@ class MeteoAmParser(Parser):
         )
 
     def _extract_title(self, result: CrawlResult, url: str) -> str:
-        """Estrae il titolo della pagina
-
-        * preferisce il contenuto del tag ``<title>`` html
-        * rimuove brand Meteo Aeronautica Militare sia che se prefisso sia se suffisso
-        * fallback sull'ultimo segmento del path
-
-        Args:
-            result(CrawlResult): risultato di crawl4ai con metadata del tag <title>
-            url(str): URL completo della pagina (usato come fallback)
-
-        Returns:
-            titolo della pagina pulito dal brand, o fallback estratto dall'URL
-        """
+        """Estrae il titolo della pagina"""
 
         metadata = getattr(result, "metadata", None)
         title = metadata.get("title") if isinstance(metadata, dict) else None

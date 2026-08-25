@@ -1,9 +1,4 @@
-"""Rigenera metriche e giudizi reali a partire dagli HTML del Gold Standard.
-
-Eseguire nel container backend, con Ollama e ``qwen3:4b`` disponibili:
-
-    python -m src.tools.generate_precomputed_results
-"""
+"""Rigenera metriche e giudizi reali a partire dagli HTML del Gold Standard"""
 
 import asyncio
 import json
@@ -18,6 +13,7 @@ from ..utils import strip_formatting
 
 
 def _load_gold_standard() -> list[dict[str, str]]:
+    """Carica tutte le entry versionate del Gold Standard"""
     entries: list[dict[str, str]] = []
     for path in sorted(GS_DATA_DIR.glob("*_gs.json")):
         with path.open(encoding="utf-8") as source:
@@ -29,6 +25,7 @@ def _load_gold_standard() -> list[dict[str, str]]:
 
 
 def _write_json(path: Path, content: list[dict]) -> None:
+    """Scrive il file json in modo leggibile e stabile"""
     temporary = path.with_suffix(".partial.json")
     with temporary.open("w", encoding="utf-8") as target:
         json.dump(content, target, ensure_ascii=False, indent=2)
@@ -37,6 +34,7 @@ def _write_json(path: Path, content: list[dict]) -> None:
 
 
 async def generate() -> None:
+    """Rigenera metriche e giudizi usando gli html salvati"""
     entries = _load_gold_standard()
     token_evaluator = TokenLevelEvaluator()
     chrf_evaluator = ChrFEvaluator()

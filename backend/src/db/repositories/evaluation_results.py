@@ -1,3 +1,5 @@
+"""Salva e legge le metriche deterministiche"""
+
 from typing import Any, TypedDict
 
 import mariadb
@@ -6,6 +8,7 @@ from ..database import get_connection
 
 
 class EvaluationResult(TypedDict):
+    """Descrive una evaluation pronta per MariaDB"""
     url: str
     parsed_text: str
     precision: float
@@ -19,13 +22,13 @@ class EvaluationResult(TypedDict):
 
 
 def upsert(result: EvaluationResult) -> None:
-    """Inserisce o aggiorna le metriche deterministiche di un GS."""
+    """Inserisce o aggiorna le metriche deterministiche di un GS"""
 
     upsert_many([result])
 
 
 def upsert_many(results: list[EvaluationResult]) -> None:
-    """Inserisce o aggiorna più evaluation in una sola transazione."""
+    """Inserisce o aggiorna più evaluation in una sola transazione"""
 
     if not results:
         return
@@ -85,7 +88,7 @@ def upsert_many(results: list[EvaluationResult]) -> None:
 
 
 def get_by_url(url: str) -> EvaluationResult | None:
-    """Restituisce l'ultima evaluation persistita per URL."""
+    """Restituisce l'ultima evaluation persistita per URL"""
 
     connection = get_connection()
     cursor = connection.cursor(dictionary=True)
@@ -115,7 +118,7 @@ def get_by_url(url: str) -> EvaluationResult | None:
 
 
 def averages_by_domain() -> dict[str, dict[str, Any]]:
-    """Aggrega le metriche persistite per dominio."""
+    """Aggrega le metriche persistite per dominio"""
 
     connection = get_connection()
     cursor = connection.cursor()

@@ -1,3 +1,5 @@
+"""Salva e legge le risorse web"""
+
 from typing import TypedDict
 import mariadb
 from ..database import get_connection
@@ -80,14 +82,7 @@ def upsert(url: str, domain: str, title: str, html_text: str) -> None:
 
 
 def delete_by_url(url: str) -> bool:
-    """Cancella una web resource
-
-    Il Gold Standard associato viene eliminato automaticamente
-    dalla foreign key ON DELETE CASCADE
-
-    Returns:
-        True se una riga è stata cancellata, altrimenti False
-    """
+    """Cancella una web resource"""
 
     connection = get_connection()
     cursor = connection.cursor()

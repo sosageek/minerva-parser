@@ -1,3 +1,5 @@
+"""Salva e legge le entry del Gold Standard"""
+
 from typing import TypedDict
 import mariadb
 from ..database import get_connection
@@ -44,10 +46,7 @@ def get_by_url(url: str) -> GoldStandardEntry | None:
 
 
 def list_urls(domain: str | None = None) -> list[str]:
-    """Restituisce tutti gli URL che possiedono un GS
-
-    Se domain è valorizzato, filtra gli URL per dominio
-    """
+    """Restituisce tutti gli URL che possiedono un GS"""
 
     connection = get_connection()
     cursor = connection.cursor()   
@@ -116,10 +115,7 @@ def list_by_domain(domain: str) -> list[GoldStandardEntry]:
 
 
 def upsert(url: str, gold_text: str) -> None:
-    """Inserisce o aggiorna un GS
-
-    Nota: la web resource deve già esistere
-    """
+    """Inserisce o aggiorna un GS"""
 
     connection = get_connection()
     cursor = connection.cursor()
