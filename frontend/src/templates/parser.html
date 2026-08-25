@@ -17,17 +17,21 @@
     <p class="eyebrow">Input</p>
     <form class="search" method="get" action="/parser" id="parse-form">
       <input class="search__input" type="text" name="url" placeholder="https://..." value="{{ url }}" required autofocus>
-      <div class="radio-group">
-        <label><input type="radio" name="mode" value="live" {% if mode != 'local' %}checked{% endif %}> Live</label>
-        <label><input type="radio" name="mode" value="local" {% if mode == 'local' %}checked{% endif %}> Local</label>
-      </div>
       <button class="btn btn--primary" type="submit" id="parse-btn">Parse</button>
+      {# il pallino sta accanto alla sua spiegazione, e il label tutto intero
+         e' cliccabile, cosi' si sceglie leggendo invece di indovinare #}
+      <div class="mode-choice">
+        <label class="mode-choice__row">
+          <input type="radio" name="mode" value="live" {% if mode != 'local' %}checked{% endif %}>
+          <span><b>Live:</b> scarica la pagina dal web e salva/aggiorna la risorsa nel database.</span>
+        </label>
+        <label class="mode-choice__row">
+          <input type="radio" name="mode" value="local" {% if mode == 'local' %}checked{% endif %}>
+          <span><b>Local:</b> legge esclusivamente l'HTML già salvato per quella URL, senza rete
+          (fallisce con "not in database" se la URL non è mai stata acquisita).</span>
+        </label>
+      </div>
     </form>
-    <p class="hint">
-      <b>Live</b> scarica la pagina dal web e salva/aggiorna la risorsa nel database.
-      <b>Local</b> legge esclusivamente l'HTML già salvato per quella URL, senza rete
-      (fallisce con "not in database" se la URL non è mai stata acquisita).
-    </p>
 
     {% if domains %}
     <div class="gs-picker">
@@ -40,8 +44,13 @@
       <button class="btn btn--outline" type="button" id="gs-go" disabled>Parse dal GS</button>
     </div>
     {% else %}
-    <div class="gs-picker"><span class="gs-picker__hint">backend non raggiumgibile.</span></div>
+    <div class="gs-picker"><span class="gs-picker__hint">backend non raggiungibile.</span></div>
     {% endif %}
+
+    {# compare solo dopo il click, lo accende lo script in fondo #}
+    <p class="attesa section-gap" id="parse-attesa" hidden>
+      Parsing e valutazione dell'LLM Judge in corso...
+    </p>
   </section>
 
   {% if error %}
@@ -85,9 +94,30 @@
   </section>
   {% endif %}
 
+  {% if gs_entry %}
+  <section class="layout__panel layout__panel--metric is-judge">
+    {# titolo e tag incolonnati, affiancati "LLM-as-a-Judge" andava a capo #}
+    <div class="panel-head panel-head--stacked">
+      <h3>LLM-as-a-Judge</h3>
+      <span class="panel-head__tag">POST /evaluate_judge</span>
+    </div>
+    {% if judge %}
+    <div class="judge-score">
+      <span class="judge-score__value">{{ judge.judge_score }}</span>
+      <span class="judge-score__max">/ 5</span>
+    </div>
+    <p class="judge-feedback">{{ judge.judge_feedback }}</p>
+    {% if judge.extra_noise %}<p class="hint"><b>Rumore rilevato:</b> {{ judge.extra_noise }}</p>{% endif %}
+    <p class="judge-model">{{ judge.model_name }}</p>
+    {% else %}
+    <p class="hint">Giudizio non disponibile{% if judge_error %}: {{ judge_error }}{% endif %}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
   {% if evaluation %}
   {% set tk = evaluation.token_level_eval %}
-  <section class="layout__panel layout__panel--metric">
+  <section class="layout__panel layout__panel--metric is-token">
     <div class="panel-head"><h3>token-level</h3></div>
     <ul class="metric-list">
       {{ metric('precision', tk.precision) }}
@@ -120,23 +150,6 @@
   </section>
   {% endif %}
 
-  {% if gs_entry %}
-  <section class="layout__panel layout__panel--metric is-judge">
-    <div class="panel-head"><h3>LLM-as-a-Judge</h3><span class="panel-head__tag">POST /evaluate_judge</span></div>
-    {% if judge %}
-    <div class="judge-score">
-      <span class="judge-score__value">{{ judge.judge_score }}</span>
-      <span class="judge-score__max">/ 5</span>
-    </div>
-    <p class="judge-feedback">{{ judge.judge_feedback }}</p>
-    {% if judge.extra_noise %}<p class="hint"><b>Rumore rilevato:</b> {{ judge.extra_noise }}</p>{% endif %}
-    <p class="judge-model">{{ judge.model_name }}  prompt {{ judge.prompt_version }}</p>
-    {% else %}
-    <p class="hint">Giudizio non disponibile{% if judge_error %}: {{ judge_error }}{% endif %}</p>
-    {% endif %}
-  </section>
-  {% endif %}
-
   {% endif %}
 
 </div>
@@ -161,14 +174,23 @@
   urlSelect.onchange = () => { go.disabled = !urlSelect.value; };
   go.onclick = () => {
     if (urlSelect.value) {
+      attendi(go);
       location.href = "/parser?url=" + encodeURIComponent(urlSelect.value) + "&mode=local";
     }
   };
 {% endif %}
 
-  // Evita doppio submit
+  // fra il click e la risposta passano dei secondi perche' il judge gira su
+  // cpu, e senza dire niente la pagina sembra piantata. blocco il bottone per
+  // evitare il doppio invio e intanto scopro la riga che spiega l'attesa
+  function attendi(bottone) {
+    bottone.disabled = true;
+    bottone.textContent = "attendi...";
+    document.getElementById("parse-attesa").hidden = false;
+  }
+
   document.getElementById("parse-form").addEventListener("submit", () => {
-    document.getElementById("parse-btn").disabled = true;
+    attendi(document.getElementById("parse-btn"));
   });
 </script>
 {% endblock %}

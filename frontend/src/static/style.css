@@ -93,16 +93,24 @@ a { color: var(--maroon); }
 .layout__panel--status   { grid-column: span 8; }
 .layout__panel--parsed { grid-column: span 7; }
 .layout__panel--gold   { grid-column: span 5; margin-top: 24px; }
-.layout__panel--metric { grid-column: span 4; }
-.layout__panel--metric.is-rouge { margin-top: 16px; }
-.layout__panel--metric.is-extra,
-.layout__panel--metric.is-judge { margin-top: 32px; }
+/* i quattro riquadri dei risultati su una riga sola, il judge per primo e
+   gli altri a scendere */
+.layout__panel--metric { grid-column: span 3; }
+.layout__panel--metric.is-token { margin-top: 16px; }
+.layout__panel--metric.is-rouge { margin-top: 32px; }
+.layout__panel--metric.is-extra { margin-top: 48px; }
 .layout__panel--meta,
 .layout__panel--html,
 .layout__panel--error,
 .layout__panel--full,
 .layout__panel--parsed.is-full { grid-column: span 12; }
 .layout__panel--half { grid-column: span 6; }
+/* gold standard builder tutto a tutta larghezza: e' una pagina in cui si lavora
+   in sequenza, scegli il dominio, acquisisci, correggi il gold text, e affiancare
+   i riquadri spezzava quell'ordine */
+.layout__panel--gs-list,
+.layout__panel--gs-fetch,
+.layout__panel--gs-delete { grid-column: span 12; }
 .layout__panel--html { margin-top: 8px; }
 .layout__panel--error { background: rgba(179, 38, 30, .1); border-color: var(--error); color: var(--error); }
 .layout__panel--success { background: rgba(31, 122, 77, .1); border-color: var(--ok); color: var(--ok); }
@@ -140,8 +148,13 @@ textarea.search__input { min-height: 160px; resize: vertical; font-size: .8rem; 
 .btn--danger { padding: 12px 20px; font-size: .75rem; background: var(--paper); color: var(--error); border: 2px solid var(--error); }
 .btn--danger:hover { background: var(--error); color: var(--paper); }
 
-.radio-group { display: flex; gap: 16px; margin-top: 12px; font-size: .8rem; }
-.radio-group label { display: flex; align-items: center; gap: 6px; cursor: pointer; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; font-size: .72rem; }
+/* scelta Live/Local: il pallino sta accanto alla riga che lo spiega, e occupa
+   tutta la larghezza sotto al campo perche' .search e' flex con wrap.
+   accent-color perche' il pallino del browser di suo sarebbe blu */
+.mode-choice { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.mode-choice__row { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; font-size: .75rem; line-height: 1.5; color: rgba(26, 26, 30, .55); }
+.mode-choice__row input[type="radio"] { flex: none; margin-top: 3px; accent-color: var(--maroon); }
+.mode-choice__row b { color: var(--ink); }
 
 .field-label { display: block; margin-bottom: 8px; font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: rgba(26, 26, 30, .68); }
 
@@ -213,6 +226,9 @@ details[open] > .html-toggle::before { content: "−"; }
 .panel-head { display: flex; align-items: baseline; gap: 8px; padding-bottom: 16px; margin-bottom: 16px; border-bottom: 2px solid var(--ink); }
 .panel-head h3 { margin: 0; font-size: .82rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
 .panel-head__tag { margin-left: auto; color: rgba(26, 26, 30, .42); font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; }
+/* nei tile stretti titolo e tag affiancati non ci stanno, qui vanno incolonnati */
+.panel-head--stacked { flex-direction: column; align-items: flex-start; gap: 4px; }
+.panel-head--stacked .panel-head__tag { margin-left: 0; }
 
 .text-body { max-height: 480px; overflow: auto; font-size: .85rem; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
 
@@ -231,6 +247,9 @@ details[open] > .html-toggle::before { content: "−"; }
 .judge-score__max { font-size: .9rem; color: rgba(26, 26, 30, .42); }
 .judge-feedback { font-size: .85rem; line-height: 1.6; }
 .judge-model { margin-top: 12px; font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: rgba(26, 26, 30, .42); }
+/* graffe dal css come per le matricole e le metriche in home */
+.judge-model::before { content: "{"; }
+.judge-model::after { content: "}"; }
 
 /* -------------------------------------------------------------- status */
 
@@ -258,4 +277,7 @@ details[open] > .html-toggle::before { content: "−"; }
 .credits { margin-top: 32px; padding-top: 16px; border-top: 2px solid var(--ink); font-size: .72rem; text-align: center; letter-spacing: .12em; text-transform: uppercase; color: rgba(26, 26, 30, .68); }
 .credits b { color: var(--ink); font-weight: 700; }
 .hint { font-size: .75rem; color: rgba(26, 26, 30, .55); margin: 8px 0 0; }
+/* avviso di attesa del parse, deve saltare all'occhio: senza si guarda un
+   bottone grigio e sembra che la pagina si sia piantata */
+.attesa { margin: 0; text-align: center; font-size: 1rem; font-weight: 700; color: var(--maroon); }
 .section-gap { margin-top: 24px; }
