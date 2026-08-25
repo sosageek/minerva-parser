@@ -96,7 +96,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Minerva Parser API",
-    #version=0.67.69.420
     description="REST API per parsing, gold standard ed evaluation",
     lifespan=lifespan,
 )

@@ -26,7 +26,7 @@ class CrawlError(Exception):
 class Parser(ABC):
     """Classe astratta per parser di pagine che producono markdown pulito
 
-    Le sottoclassi devono implementare ``parse`` e ``clean_markdown``
+    Le sottoclassi devono implementare ``parse`` e ``normalize``
 
     il browser è condiviso tra tutti i parser tramite ``_crawler.get_crawler()``
 
