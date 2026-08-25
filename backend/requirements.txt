@@ -1,7 +1,14 @@
-crawl4ai>=0.8
-pydantic>=2.0
-fastapi>=0.110
-uvicorn[standard]>=0.27
-sacrebleu>=2.4
-python-dotenv>=1.0
+crawl4ai==0.9.2
+pydantic==2.13.4
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+sacrebleu==2.6.0
+python-dotenv==1.2.3
 mariadb==1.1.14
+# le tre qui sotto arrivano con crawl4ai, ma le dichiariamo lo stesso perché
+# le usiamo direttamente e perché decidono l'output del parser:
+# playwright sceglie la versione di chromium, bs4 e lxml fanno il preprocessing
+# dell'html di wikipedia da cui dipende il suo F1
+playwright==1.62.0
+beautifulsoup4==4.15.0
+lxml==6.1.2

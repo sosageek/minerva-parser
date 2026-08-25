@@ -60,7 +60,11 @@ services:
       retries: 10
 
   ollama:
-    image: ollama/ollama
+    # fissata al digest e non a "latest": l'entrypoint qui sotto usa
+    # --think=false e l'healthcheck legge l'output di "ollama ps", due cose
+    # che una versione futura puo' cambiare. col digest chi corregge scarica
+    # esattamente l'immagine su cui abbiamo passato i test
+    image: ollama/ollama@sha256:4dea9fb511947e24a84237bb636b0203abcb2ff0d3fbc7b4ff865deb91362131
     container_name: parser-ollama
     environment:
       OLLAMA_KEEP_ALIVE: "-1"
@@ -87,7 +91,11 @@ services:
       start_period: 60s
       interval: 10s
       timeout: 10s
-      retries: 60
+      # 180 tentativi sono mezz'ora: il modello pesa 2.5 GB e con i 60 di
+      # prima bastava una rete lenta per far scadere l'healthcheck, con il
+      # backend che poi non parte per via del depends_on. se ollama e' sano
+      # il check passa subito lo stesso, questo margine non costa niente
+      retries: 180
 
 volumes:
   mariadb_data:
