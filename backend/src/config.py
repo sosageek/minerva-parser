@@ -35,7 +35,7 @@ DATABASE_PASSWORD: str = os.environ.get("DATABASE_PASSWORD", "minerva_password")
 DATABASE_POOL_SIZE: int = int(os.environ.get("DATABASE_POOL_SIZE", "5"))
 OLLAMA_URL: str = os.environ.get("OLLAMA_URL", "http://ollama:11434")
 OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "qwen3:4b")
-OLLAMA_TIMEOUT: float = float(os.environ.get("OLLAMA_TIMEOUT", "120"))
+OLLAMA_TIMEOUT: float = float(os.environ.get("OLLAMA_TIMEOUT", "25"))
 STATUS_CHECK_TIMEOUT: float = float(os.environ.get("STATUS_CHECK_TIMEOUT", "1.0"))
 
 

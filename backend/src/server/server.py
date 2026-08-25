@@ -269,13 +269,58 @@ def _judge_key(parsed_text: str, gold_text: str) -> str:
     return digest.hexdigest()
 
 
-def _judge_cached(parsed_text: str, gold_text: str) -> JudgeResult:
+def _persisted_verdict(url: str, parsed_text: str) -> JudgeResult | None:
+    """Giudizio già salvato nel database per quell'URL, se vale ancora
+
+    serve solo come ripiego: un voto vero calcolato in passato dice molto più
+    del punteggio neutro, che è solo un segnaposto per non far cadere la media
+
+    il voto è salvato per url, ma un giudizio riguarda una coppia (parsed, gold):
+    i test automatici riscrivono html_text con /add_web_resource, quindi la stessa
+    url può dare un parsed_text diverso da prima. per questo prima di riusarlo
+    controlliamo che il testo su cui era stato calcolato sia ancora quello, se no
+    serviremmo un voto su un testo che non esiste più
+
+    Returns:
+        ``JudgeResult`` ricostruito dalla riga persistita, oppure ``None``
+    """
+
+    try:
+        evaluation = evaluation_repository.get_by_url(url)
+        if evaluation is None or evaluation["parsed_text"] != parsed_text:
+            return None
+
+        row = judge_repository.get_by_url(url)
+        if row is None:
+            return None
+
+        return JudgeResult(
+            model_name=row["model_name"],
+            judge_score=row["judge_score"],
+            judge_feedback=row["judge_feedback"],
+            extra_noise=row["extra_noise"],
+            diagnostics="persisted",
+            prompt_version=row["prompt_version"],
+        )
+    except Exception as err:
+        # qualunque cosa vada storta qui, dal database a una riga che non passa
+        # la validazione, deve tornare il punteggio neutro: mai un 500
+        logger.warning("giudizio persistito non utilizzabile per %s: %s", url, err)
+        return None
+
+
+def _judge_cached(parsed_text: str, gold_text: str, url: str | None = None) -> JudgeResult:
     """Giudizio del judge, riusato se quella coppia è già passata di qui
 
     la cache vive solo in memoria di processo, al riavvio del container si riparte da zero
 
+    Args:
+        parsed_text: testo prodotto dal parser
+        gold_text: testo di riferimento
+        url: se noto, permette di ripiegare sul giudizio salvato invece che sul neutro
+
     Returns:
-        ``JudgeResult``, dalla cache oppure appena calcolato
+        ``JudgeResult``, dalla cache, appena calcolato, persistito o neutro
     """
 
     key = _judge_key(parsed_text, gold_text)
@@ -289,6 +334,16 @@ def _judge_cached(parsed_text: str, gold_text: str) -> JudgeResult:
     # cachiamo ce li teniamo fino al riavvio anche dopo che è tornato su
     if result.diagnostics in ("ok", "repaired"):
         _judge_cache[key] = result
+        return result
+
+    # il modello non ha risposto. se quella URL un giudizio ce l'ha già nel database
+    # lo usiamo: resta un ripiego, ma di un voto vero invece che di un segnaposto.
+    # non lo mettiamo in cache, la prossima volta il modello potrebbe rispondere
+    if url is not None:
+        persisted = _persisted_verdict(url, parsed_text)
+        if persisted is not None:
+            logger.info("giudizio non calcolabile per %s, uso quello salvato", url)
+            return persisted
 
     return result
 
@@ -722,7 +777,9 @@ async def full_gs_eval(
             continue
 
         evaluations.append(_do_evaluate(doc.parsed_text, entry["gold_text"]))
-        verdict = await asyncio.to_thread(_judge_cached, doc.parsed_text, entry["gold_text"])
+        verdict = await asyncio.to_thread(
+            _judge_cached, doc.parsed_text, entry["gold_text"], url
+        )
         judge_scores.append(verdict.judge_score)
 
     if not evaluations or not judge_scores:

@@ -17,7 +17,12 @@ services:
       DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-5}
       OLLAMA_URL: ${OLLAMA_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
-      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-120}
+      # tetto per singolo giudizio. su una macchina normale non si raggiunge mai,
+      # lì un giudizio costa circa 7s. serve sulle macchine lente: senza, undici
+      # entry da 120s sfondano il tempo di risposta di /full_gs_eval e la richiesta
+      # non arriva in fondo. con 25 il ripiego costa poco e restano 85s per il
+      # parsing delle undici pagine, che su una macchina lenta rallenta anche lui
+      OLLAMA_TIMEOUT: ${OLLAMA_TIMEOUT:-25}
       STATUS_CHECK_TIMEOUT: ${STATUS_CHECK_TIMEOUT:-1.0}
     volumes:
       - ./gs_data:/app/gs_data
